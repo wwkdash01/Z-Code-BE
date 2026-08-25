@@ -112,11 +112,20 @@
             <version>1.10.0</version>
         </dependency>
 
+        <!-- LangChain4j openAI接口兼容-->
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-open-ai-spring-boot-starter</artifactId>
             <version>1.10.0-beta18</version>
         </dependency>
+
+        <!-- LangChain4j 流式输出-->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-reactor</artifactId>
+            <version>1.10.0-beta18</version>
+        </dependency>
+
 
     </dependencies>
 

@@ -43,6 +43,9 @@ build/
 # 根目录误生成的空 lock 文件
 /package-lock.json
 
+# 代码生成输出目录（运行生成）
+/tmp/
+
 # 本地 Claude 配置
 /.claude/
 
