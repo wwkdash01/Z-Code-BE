@@ -126,7 +126,6 @@
             <version>1.10.0-beta18</version>
         </dependency>
 
-
     </dependencies>
 
     <build>

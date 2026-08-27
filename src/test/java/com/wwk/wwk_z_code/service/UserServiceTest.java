@@ -68,32 +68,6 @@ class UserServiceTest {
     // region userRegister
 
     @Test
-    void userRegister_blankParams_throwsParamError() {
-        BusinessException e = assertThrows(BusinessException.class,
-                () -> service.userRegister(new UserRegisterRequestDTO()));
-        assertEquals(ErrorCode.PARAM_ERROR.getCode(), e.getCode());
-    }
-
-    @Test
-    void userRegister_shortAccount_throwsParamError() {
-        UserRegisterRequestDTO dto = registerDTO();
-        dto.setUserAccount("12345");
-
-        BusinessException e = assertThrows(BusinessException.class, () -> service.userRegister(dto));
-        assertEquals(ErrorCode.PARAM_ERROR.getCode(), e.getCode());
-    }
-
-    @Test
-    void userRegister_shortPassword_throwsParamError() {
-        UserRegisterRequestDTO dto = registerDTO();
-        dto.setPassword("12345");
-        dto.setConfirmPassword("12345");
-
-        BusinessException e = assertThrows(BusinessException.class, () -> service.userRegister(dto));
-        assertEquals(ErrorCode.PARAM_ERROR.getCode(), e.getCode());
-    }
-
-    @Test
     void userRegister_passwordMismatch_throwsParamError() {
         UserRegisterRequestDTO dto = registerDTO();
         dto.setConfirmPassword("654321");

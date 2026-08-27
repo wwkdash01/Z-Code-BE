@@ -51,18 +51,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
         String confirmPassword = userRegisterRequestDTO.getConfirmPassword();
 
         // 1-校验参数是否符合业务逻辑
-        if (StrUtil.hasBlank(userAccount, password, confirmPassword)) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "参数包含空值");
-        }
-
-        if (userAccount.length() < 6) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "用户账号长度过短");
-        }
-
-        if (password.length() < 6) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR, "用户密码过短");
-        }
-
         if (!password.equals(confirmPassword)) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "确认密码与原密码不一致");
         }

@@ -66,6 +66,16 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.code").value(40000));
     }
 
+    @Test
+    void register_blankParams_returnsParamError() throws Exception {
+        mvc.perform(post("/users/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                // @NotNull 校验失败 → MethodArgumentNotValidException → GlobalExceptionHandler 返回 PARAM_ERROR
+                .andExpect(jsonPath("$.code").value(40000));
+    }
+
     // endregion
 
     // region login
