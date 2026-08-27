@@ -1,6 +1,5 @@
 package com.wwk.wwk_z_code.common;
 
-import com.wwk.wwk_z_code.exception.ErrorCode;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -34,13 +33,4 @@ public class BaseResponse<T> implements Serializable {
         this.data = data;
     }
 
-    /**
-     * 构造异常响应结果
-     * @param errorCode 标准状态码
-     */
-    public BaseResponse(ErrorCode errorCode) {
-        this.code = errorCode.getCode();
-        this.message = errorCode.getMessage();
-        this.data = null;
-    }
 }

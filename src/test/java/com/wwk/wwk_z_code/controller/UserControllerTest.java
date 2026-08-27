@@ -45,7 +45,7 @@ class UserControllerTest {
     void register_success_returnsUserId() throws Exception {
         when(userService.userRegister(any())).thenReturn(10086L);
 
-        mvc.perform(post("/users/register")
+        mvc.perform(post("/users/guest/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"userAccount\":\"zhangsan\",\"password\":\"123456\",\"confirmPassword\":\"123456\"}"))
                 .andExpect(status().isOk())
@@ -58,7 +58,7 @@ class UserControllerTest {
 
     @Test
     void register_invalidParams_returnsParamError() throws Exception {
-        mvc.perform(post("/users/register")
+        mvc.perform(post("/users/guest/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"userAccount\":\"a\",\"password\":\"1\",\"confirmPassword\":\"1\"}"))
                 .andExpect(status().isOk())
@@ -68,7 +68,7 @@ class UserControllerTest {
 
     @Test
     void register_blankParams_returnsParamError() throws Exception {
-        mvc.perform(post("/users/register")
+        mvc.perform(post("/users/guest/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk())
@@ -87,7 +87,7 @@ class UserControllerTest {
         vo.setUserAccount("zhangsan");
         when(userService.login(any(), any())).thenReturn(vo);
 
-        mvc.perform(post("/users/login")
+        mvc.perform(post("/users/guest/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"userAccount\":\"zhangsan\",\"password\":\"123456\"}"))
                 .andExpect(status().isOk())
@@ -100,7 +100,7 @@ class UserControllerTest {
         when(userService.login(any(), any()))
                 .thenThrow(new BusinessException(ErrorCode.PARAM_ERROR, "密码错误"));
 
-        mvc.perform(post("/users/login")
+        mvc.perform(post("/users/guest/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"userAccount\":\"zhangsan\",\"password\":\"123456\"}"))
                 .andExpect(jsonPath("$.code").value(40000))
@@ -118,7 +118,7 @@ class UserControllerTest {
         vo.setUserAccount("zhangsan");
         when(userService.getCurrentUser(any())).thenReturn(vo);
 
-        mvc.perform(get("/users/login-status"))
+        mvc.perform(get("/users/user/login-status"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.userAccount").value("zhangsan"));
     }
@@ -127,20 +127,20 @@ class UserControllerTest {
     void logout_success_returnsTrue() throws Exception {
         when(userService.userLogout(any())).thenReturn(true);
 
-        mvc.perform(post("/users/logout"))
+        mvc.perform(post("/users/user/logout"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(true));
     }
 
     // endregion
 
-    // region saveUser (POST /users)
+    // region saveUser (POST /users/admin)
 
     @Test
     void saveUser_success_returnsTrue() throws Exception {
         when(userService.saveUser(any())).thenReturn(true);
 
-        mvc.perform(post("/users")
+        mvc.perform(post("/users/admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"userAccount\":\"zhangsan\",\"userPassword\":\"123456\"}"))
                 .andExpect(status().isOk())
@@ -152,7 +152,7 @@ class UserControllerTest {
 
     @Test
     void saveUser_invalidParams_returnsParamError() throws Exception {
-        mvc.perform(post("/users")
+        mvc.perform(post("/users/admin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"userAccount\":\"zhangsan\",\"userPassword\":\"1\"}"))
                 .andExpect(jsonPath("$.code").value(40000));
@@ -166,7 +166,7 @@ class UserControllerTest {
     void removeUserById_success_returnsTrue() throws Exception {
         when(userService.removeUserById(1L)).thenReturn(true);
 
-        mvc.perform(delete("/users/1"))
+        mvc.perform(delete("/users/admin/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(true));
 
@@ -175,7 +175,7 @@ class UserControllerTest {
 
     @Test
     void removeUserById_invalidId_returnsSystemError() throws Exception {
-        mvc.perform(delete("/users/0"))
+        mvc.perform(delete("/users/admin/0"))
                 .andExpect(jsonPath("$.code").value(50000));
     }
 
@@ -187,7 +187,7 @@ class UserControllerTest {
     void update_success_returnsTrue() throws Exception {
         when(userService.updateUserById(any(), eq(1L))).thenReturn(true);
 
-        mvc.perform(put("/users/1")
+        mvc.perform(put("/users/admin/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"userName\":\"newname\"}"))
                 .andExpect(status().isOk())
@@ -198,7 +198,7 @@ class UserControllerTest {
 
     @Test
     void update_invalidParams_returnsParamError() throws Exception {
-        mvc.perform(put("/users/1")
+        mvc.perform(put("/users/admin/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"userPassword\":\"1\"}"))
                 .andExpect(jsonPath("$.code").value(40000));
@@ -206,21 +206,21 @@ class UserControllerTest {
 
     // endregion
 
-    // region getInfo (GET /users/Info/{id})
+    // region getInfo (GET /users/admin/{id})
 
     @Test
     void getInfo_success_returnsUser() throws Exception {
         User user = User.builder().id(1L).userAccount("zhangsan").build();
         when(userService.getUserById(1L)).thenReturn(user);
 
-        mvc.perform(get("/users/Info/1"))
+        mvc.perform(get("/users/admin/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.userAccount").value("zhangsan"));
     }
 
     @Test
     void getInfo_invalidId_returnsSystemError() throws Exception {
-        mvc.perform(get("/users/Info/0"))
+        mvc.perform(get("/users/admin/0"))
                 .andExpect(jsonPath("$.code").value(50000));
     }
 
@@ -234,7 +234,7 @@ class UserControllerTest {
         page.setRecords(List.of(User.builder().id(1L).userAccount("zhangsan").build()));
         when(userService.getUserByPage(any())).thenReturn(page);
 
-        mvc.perform(get("/users/page")
+        mvc.perform(get("/users/admin/page")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk())

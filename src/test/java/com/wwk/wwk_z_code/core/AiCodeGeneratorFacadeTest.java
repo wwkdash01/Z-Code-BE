@@ -17,10 +17,15 @@ class AiCodeGeneratorFacadeTest {
 
     @Test
     void generateAndSaveCode() {
-        File singletonResult = aiCodeGeneratorFacade.generateAndSaveCode("做一个个人博客网站模版，20行以内", CodeGenEnum.SINGLETON_HTML);
-        Assertions.assertNotNull(singletonResult);
+        Long appId = 1L;
 
-        File multifileResult = aiCodeGeneratorFacade.generateAndSaveCode("做一个个人博客网站模版，70行以内", CodeGenEnum.MULTIFILE_HTML);
+        File singletonResult = aiCodeGeneratorFacade.generateAndSaveCode("做一个个人博客网站模版，20行以内", CodeGenEnum.SINGLETON_HTML, appId);
+        Assertions.assertNotNull(singletonResult);
+        // 目录名以 appId 结尾，验证 appId 端到端透传生效
+        Assertions.assertTrue(singletonResult.getAbsolutePath().endsWith("_" + appId));
+
+        File multifileResult = aiCodeGeneratorFacade.generateAndSaveCode("做一个个人博客网站模版，70行以内", CodeGenEnum.MULTIFILE_HTML, appId);
         Assertions.assertNotNull(multifileResult);
+        Assertions.assertTrue(multifileResult.getAbsolutePath().endsWith("_" + appId));
     }
 }

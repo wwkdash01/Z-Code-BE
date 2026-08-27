@@ -32,7 +32,7 @@ public class AiCodeGeneratorFacade {
      * @param codeGenEnum 代码生成模式枚举
      * @return 代码保存目录
      */
-    public File generateAndSaveCode(String userPrompt, CodeGenEnum codeGenEnum) {
+    public File generateAndSaveCode(String userPrompt, CodeGenEnum codeGenEnum, Long appId) throws BusinessException {
         // 1-参数校验
         if (userPrompt == null || codeGenEnum == null) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "未指定生成模式");
@@ -40,8 +40,8 @@ public class AiCodeGeneratorFacade {
 
         // 2-分支判断执行
         return switch (codeGenEnum) {
-            case SINGLETON_HTML -> generateAndSaveSingletonCode(userPrompt);
-            case MULTIFILE_HTML -> generateAndSaveMultiFileCode(userPrompt);
+            case SINGLETON_HTML -> generateAndSaveSingletonCode(userPrompt,  appId);
+            case MULTIFILE_HTML -> generateAndSaveMultiFileCode(userPrompt, appId);
             default -> {
                 String errMsg = "无效的生成模式:" + codeGenEnum.getCodeGenMode();
                 throw new BusinessException(ErrorCode.PARAM_ERROR, errMsg);
@@ -56,7 +56,7 @@ public class AiCodeGeneratorFacade {
      * @param codeGenEnum 代码生成模式枚举
      * @return LLM 流式输出
      */
-    public Flux<String> generateAndSaveCodeByStream(String userPrompt, CodeGenEnum codeGenEnum) {
+    public Flux<String> generateAndSaveCodeByStream(String userPrompt, CodeGenEnum codeGenEnum, Long appId) throws BusinessException {
         // 1-参数校验
         if (userPrompt == null || codeGenEnum == null) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "未指定生成模式");
@@ -82,7 +82,7 @@ public class AiCodeGeneratorFacade {
                         // 4-输出完成后解析并保存
                         String codeResult = stringBuilder.toString();
                         Object parsedResult = CodeParserExecutor.executeParse(codeResult, codeGenEnum);
-                        File savedDir = CodeFileSaverExecutor.saveCode(parsedResult, codeGenEnum);
+                        File savedDir = CodeFileSaverExecutor.saveCode(parsedResult, codeGenEnum, appId);
 
                         log.debug("文件保存成功:{}", savedDir.getAbsolutePath());
                     } catch (Exception e) {
@@ -97,9 +97,9 @@ public class AiCodeGeneratorFacade {
      * @param userPrompt 用户提示词
      * @return 代码保存目录
      */
-    private File generateAndSaveSingletonCode(String userPrompt) {
+    private File generateAndSaveSingletonCode(String userPrompt, Long appId) {
         SingletonHtmlCodeResult result = aiCodeGeneratorService.generateSingletonFileCode(userPrompt);
-        return CodeFileSaverExecutor.saveCode(result, CodeGenEnum.SINGLETON_HTML);
+        return CodeFileSaverExecutor.saveCode(result, CodeGenEnum.SINGLETON_HTML, appId);
     }
 
     /**
@@ -108,9 +108,9 @@ public class AiCodeGeneratorFacade {
      * @param userPrompt 用户提示词
      * @return 代码保存目录
      */
-    private File generateAndSaveMultiFileCode(String userPrompt) {
+    private File generateAndSaveMultiFileCode(String userPrompt, Long appId) {
         MultiFileHtmlCodeResult result = aiCodeGeneratorService.generateMultiFileCode(userPrompt);
-        return CodeFileSaverExecutor.saveCode(result, CodeGenEnum.MULTIFILE_HTML);
+        return CodeFileSaverExecutor.saveCode(result, CodeGenEnum.MULTIFILE_HTML, appId);
     }
 
 }

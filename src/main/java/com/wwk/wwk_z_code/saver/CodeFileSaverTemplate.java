@@ -27,9 +27,12 @@ public abstract class CodeFileSaverTemplate<T> {
      *
      * @return 唯一保存目录
      */
-    private static String buildUniqueSaveDir() {
+    private static String buildUniqueSaveDir(Long appId) {
+        if (appId == null) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "应用id不能为空");
+        }
         String timestamp = DateUtil.format(new Date(), "yyyyMMdd_HHmmss");
-        String uniqueSaveDirSuffix = StrUtil.format("{}_{}_{}", timestamp, RandomUtil.randomString(4));
+        String uniqueSaveDirSuffix = StrUtil.format("{}_{}_{}", timestamp, RandomUtil.randomString(4), appId);
         String uniqueSaveDir = FILE_SAVE_ROOT_DIR + File.separator + uniqueSaveDirSuffix;
 
         FileUtil.mkdir(uniqueSaveDir);
@@ -42,12 +45,12 @@ public abstract class CodeFileSaverTemplate<T> {
      * @param result 代码结果
      * @return 代码保存目录
      */
-    public final File saveCodeResult(T result) {
+    public final File saveCodeResult(T result, Long appId) {
         // 1-参数校验
         validateResult(result);
 
         // 2-构建目录
-        String saveDir = buildUniqueSaveDir();
+        String saveDir = buildUniqueSaveDir(appId);
 
         // 3-保存文件
         saveCodeResultToFile(result, saveDir);

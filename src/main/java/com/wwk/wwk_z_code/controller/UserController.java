@@ -7,7 +7,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -33,7 +32,7 @@ public class UserController {
      * @param userAddRequestDTO 数据库表实体PO
      * @return {@code true} 保存成功，{@code false} 保存失败
      */
-    @PostMapping
+    @PostMapping("/admin")
     public Boolean saveUser(
             @RequestBody
             @Valid
@@ -47,7 +46,7 @@ public class UserController {
      * @param id 主键
      * @return {@code true} 删除成功，{@code false} 删除失败
      */
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/admin/{id}")
     public Boolean removeUserById(
             @PathVariable
             @NotNull
@@ -62,7 +61,7 @@ public class UserController {
      * @param userUpdateRequestDTO 数据库表实体PO
      * @return {@code true} 更新成功，{@code false} 更新失败
      */
-    @PutMapping("/{id}")
+    @PutMapping("/admin/{id}")
     public Boolean update(
             @RequestBody
             @Valid
@@ -81,7 +80,7 @@ public class UserController {
      * @param id 主键
      * @return 数据库表实体PO
      */
-    @GetMapping("Info/{id}")
+    @GetMapping("/admin/{id}")
     public User getInfo(
             @PathVariable
             @Min(value = 1L, message = "用户id不能为负")
@@ -95,7 +94,7 @@ public class UserController {
      * @param userQueryRequestDTO 用户分页查询DTO（query 参数自动绑定）
      * @return 分页对象
      */
-    @GetMapping("/page")
+    @GetMapping("/admin/page")
     public Page<User> getUserByPage(
             @ModelAttribute
             @Valid
@@ -108,7 +107,7 @@ public class UserController {
      * @param userRegisterRequestDTO 用户注册DTO
      * @return 用户id
      */
-    @PostMapping("/register")
+    @PostMapping("/guest/register")
     public Long userRegister(
             @RequestBody
             @Valid
@@ -122,7 +121,7 @@ public class UserController {
      * @param request Http请求
      * @return 用户信息
      */
-    @PostMapping("/login")
+    @PostMapping("/guest/login")
     public UserVO userLogin(
             @RequestBody
             @Valid
@@ -136,7 +135,7 @@ public class UserController {
      * @param request Http请求
      * @return 用户信息
      */
-    @GetMapping("/login-status")
+    @GetMapping("/user/login-status")
     public UserVO getCurrentUser(HttpServletRequest request) {
         return userService.getCurrentUser(request);
     }
@@ -146,7 +145,7 @@ public class UserController {
      * @param request Http请求
      * @return {@code true} 注销成功，{@code false} 注销失败
      */
-    @PostMapping("/logout")
+    @PostMapping("/user/logout")
     public Boolean userLogout(HttpServletRequest request) {
         return userService.userLogout(request);
     }

@@ -22,10 +22,10 @@ public class CodeFileSaverExecutor {
      * @param codeGenEnum 代码生成模式枚举
      * @return 代码保存目录
      */
-    public static File saveCode(Object result, CodeGenEnum codeGenEnum) {
+    public static File saveCode(Object result, CodeGenEnum codeGenEnum, Long appId) {
         return switch (codeGenEnum) {
-            case SINGLETON_HTML -> singletonCodeSaverTemplate.saveCodeResult((SingletonHtmlCodeResult) result);
-            case MULTIFILE_HTML -> multifileCodeSaverTemplate.saveCodeResult((MultiFileHtmlCodeResult) result);
+            case SINGLETON_HTML -> singletonCodeSaverTemplate.saveCodeResult((SingletonHtmlCodeResult) result, appId);
+            case MULTIFILE_HTML -> multifileCodeSaverTemplate.saveCodeResult((MultiFileHtmlCodeResult) result, appId);
             default -> {
                 throw new BusinessException(ErrorCode.CODE_GENERATE_ERROR, "无效的生成模式");
             }

@@ -55,3 +55,4 @@ build/
 # 公开展示仓库不包含（保留本地）
 /.gitattributes
 /data-analysis-integration.md
+/plan/
