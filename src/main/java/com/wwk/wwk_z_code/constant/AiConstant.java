@@ -21,4 +21,9 @@ public interface AiConstant {
      */
     Pattern JS_CODE_PATTERN = Pattern.compile(
             "```(?:javascript|js)\\s*[\\r\\n]+([\\s\\S]*?)[\\r\\n]*```", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * 内部属性 代码文件保存的根目录
+     */
+    String FILE_SAVE_ROOT_DIR = System.getProperty("user.dir") + "/tmp/code_outputs";
 }

@@ -5,6 +5,7 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.CharsetUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
+import com.wwk.wwk_z_code.constant.AiConstant;
 import com.wwk.wwk_z_code.exception.BusinessException;
 import com.wwk.wwk_z_code.exception.ErrorCode;
 
@@ -17,10 +18,7 @@ import java.util.Date;
  * @param <T> 代码结果类型（单文件/多文件代码结果）
  */
 public abstract class CodeFileSaverTemplate<T> {
-    /**
-     * 内部属性 代码文件保存的根目录
-     */
-    private static final String FILE_SAVE_ROOT_DIR = System.getProperty("user.dir") + "/tmp/code_outputs";
+
 
     /**
      * 内部方法 构造唯一文件路径（根目录+时间戳+随机后缀）
@@ -33,7 +31,7 @@ public abstract class CodeFileSaverTemplate<T> {
         }
         String timestamp = DateUtil.format(new Date(), "yyyyMMdd_HHmmss");
         String uniqueSaveDirSuffix = StrUtil.format("{}_{}_{}", timestamp, RandomUtil.randomString(4), appId);
-        String uniqueSaveDir = FILE_SAVE_ROOT_DIR + File.separator + uniqueSaveDirSuffix;
+        String uniqueSaveDir = AiConstant.FILE_SAVE_ROOT_DIR + File.separator + uniqueSaveDirSuffix;
 
         FileUtil.mkdir(uniqueSaveDir);
         return uniqueSaveDir;
