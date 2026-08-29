@@ -68,6 +68,12 @@ public class App implements Serializable {
     private CodeGenEnum codeGenType;
 
     /**
+     * 应用代码生成位置
+     */
+    @Column("codeGenDir")
+    private String codeGenDir;
+
+    /**
      * 应用展示优先级
      */
     @Sortable
@@ -80,6 +86,13 @@ public class App implements Serializable {
     @Sortable
     @Column("deployKey")
     private String deployKey = null;
+
+    /**
+     * 应用部署目录
+     */
+    @Sortable
+    @Column("deployDir")
+    private String deployDir;
 
     /**
      * 应用部署时间

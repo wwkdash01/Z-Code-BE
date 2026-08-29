@@ -57,6 +57,30 @@ public interface AppService extends IService<App> {
     Page<AppVO> getMyAppByPage(AppQueryRequestDTO appQueryRequestDTO, HttpServletRequest request);
 
     /**
+     * 流式生成代码并落盘（USER，校验归属）
+     * @param appCodeStreamQueryDTO 代码流查询请求DTO
+     * @param request HTTP请求
+     * @return SSE 流式响应文本块集合
+     */
+    Flux<String> getCodeGenStream(AppCodeStreamQueryDTO appCodeStreamQueryDTO, HttpServletRequest request);
+
+    /**
+     * 部署应用代码到独立目录（USER，校验归属；deployKey不存在则自动生成）
+     * @param appDeployRequestDTO 部署请求DTO
+     * @param request HTTP请求
+     * @return 网页访问 URL
+     */
+    String deployApp(AppDeployRequestDTO appDeployRequestDTO, HttpServletRequest request);
+
+    /**
+     * 获取应用代码预览 URL（USER，校验归属）
+     * @param appId 应用ID
+     * @param request HTTP请求
+     * @return 预览页面 URL
+     */
+    String previewApp(Long appId, HttpServletRequest request);
+
+    /**
      * 分页查询精选应用（GUEST，游客公开，脱敏VO）
      * @param appQueryRequestDTO 应用分页查询DTO
      * @return 应用视图分页对象
@@ -92,6 +116,4 @@ public interface AppService extends IService<App> {
      */
     Page<App> getAppByAdminPage(AppAdminQueryRequestDTO appAdminQueryRequestDTO);
 
-
-    public Flux<String> getCodeGenStream(AppCodeStreamQueryDTO appCodeStreamQueryDTO, HttpServletRequest request);
 }

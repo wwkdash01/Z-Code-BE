@@ -5,7 +5,7 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.CharsetUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
-import com.wwk.wwk_z_code.constant.AiConstant;
+import com.wwk.wwk_z_code.constant.AppConstant;
 import com.wwk.wwk_z_code.exception.BusinessException;
 import com.wwk.wwk_z_code.exception.ErrorCode;
 
@@ -31,7 +31,7 @@ public abstract class CodeFileSaverTemplate<T> {
         }
         String timestamp = DateUtil.format(new Date(), "yyyyMMdd_HHmmss");
         String uniqueSaveDirSuffix = StrUtil.format("{}_{}_{}", timestamp, RandomUtil.randomString(4), appId);
-        String uniqueSaveDir = AiConstant.FILE_SAVE_ROOT_DIR + File.separator + uniqueSaveDirSuffix;
+        String uniqueSaveDir = AppConstant.FILE_SAVE_ROOT_DIR + File.separator + uniqueSaveDirSuffix;
 
         FileUtil.mkdir(uniqueSaveDir);
         return uniqueSaveDir;

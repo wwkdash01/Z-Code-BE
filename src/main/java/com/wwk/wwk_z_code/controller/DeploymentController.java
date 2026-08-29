@@ -1,6 +1,7 @@
 package com.wwk.wwk_z_code.controller;
 
-import com.wwk.wwk_z_code.constant.AiConstant;
+import com.wwk.wwk_z_code.annotation.IgnoreResultWrapper;
+import com.wwk.wwk_z_code.constant.AppConstant;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -20,13 +21,14 @@ import java.io.File;
 public class DeploymentController {
 
     // 应用生成根目录（用于浏览）
-    private static final String PREVIEW_ROOT_DIR = AiConstant.FILE_SAVE_ROOT_DIR;
+    private static final String PREVIEW_ROOT_DIR = AppConstant.FILE_SAVE_ROOT_DIR;
 
     /**
      * 提供静态资源访问，支持目录重定向
      * 访问格式：http://{ip:port}/api/deployments/{deployKey}[/{fileName}]
      */
     @GetMapping("/{deployKey}/**")
+    @IgnoreResultWrapper
     public ResponseEntity<Resource> serveStaticResource(
             @PathVariable String deployKey,
             HttpServletRequest request) {
@@ -39,7 +41,7 @@ public class DeploymentController {
             if (resourcePath.isEmpty()) {
                 HttpHeaders headers = new HttpHeaders();
                 headers.add("Location", request.getRequestURI() + "/");
-                return new ResponseEntity<>(headers, HttpStatus.MOVED_PERMANENTLY);
+                return new ResponseEntity<>(headers, HttpStatus.FOUND);
             }
 
             // 默认返回 index.html

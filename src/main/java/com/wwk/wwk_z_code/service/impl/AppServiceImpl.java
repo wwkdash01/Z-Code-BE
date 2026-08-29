@@ -1,5 +1,8 @@
 package com.wwk.wwk_z_code.service.impl;
 
+import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -7,6 +10,8 @@ import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.wwk.wwk_z_code.annotation.AuthCheck;
 import com.wwk.wwk_z_code.annotation.Sortable;
 import com.wwk.wwk_z_code.common.PageRequest;
+import com.wwk.wwk_z_code.common.ThrowUtils;
+import com.wwk.wwk_z_code.constant.AppConstant;
 import com.wwk.wwk_z_code.core.AiCodeGeneratorFacade;
 import com.wwk.wwk_z_code.exception.BusinessException;
 import com.wwk.wwk_z_code.exception.ErrorCode;
@@ -25,6 +30,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
+import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
@@ -298,6 +304,81 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
         // 3-调用门面生成返回
         return aiCodeGeneratorFacade.generateAndSaveCodeByStream(appCodeStreamQueryDTO.getUserPrompt(), codeGenEnum, dbApp.getId());
+    }
+
+    @Override
+    public String deployApp(AppDeployRequestDTO appDeployRequestDTO, HttpServletRequest request) {
+        // 1-查询App并校验App存在 && 校验App属于用户，否则抛异常
+        App dbApp = checkAppOwnership(appDeployRequestDTO.getAppId(), request);
+
+        // 2-检查DeployKey，不存在则生成（6位唯一随机串）
+        if (StrUtil.isBlank(dbApp.getDeployKey())) {
+            String deployKey = RandomUtil.randomString(6);
+            while (existsByDeployKey(deployKey)) {
+                deployKey = RandomUtil.randomString(6);
+            }
+            dbApp.setDeployKey(deployKey);
+        }
+
+        // 3-获取代码生成目录
+        String codeGenDir = dbApp.getCodeGenDir();
+        if (StrUtil.isBlank(codeGenDir)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "应用未配置代码生成目录");
+        }
+
+        // 4-校验生成目录是否存在，不存在抛异常
+        File sourceDir = new File(AppConstant.FILE_SAVE_ROOT_DIR + File.separator + codeGenDir);
+        if (!sourceDir.exists()) {
+            throw new BusinessException(ErrorCode.CODE_GENERATE_NOT_FOUND, "代码尚未生成，无法部署");
+        }
+
+        // 5-复制生成目录内容到部署目录
+        String targetPath = AppConstant.CODE_DEPLOY_DIR + File.separator + dbApp.getDeployKey();
+        File targetDir = new File(targetPath);
+        if (!targetDir.exists()) {
+            FileUtil.mkdir(targetDir);
+        }
+
+        try {
+            FileUtil.copyContent(sourceDir, targetDir, true);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "部署文件复制失败");
+        }
+
+        // 6-将DeployKey和codeGenDir落库
+        ThrowUtils.throwIf(!this.updateById(dbApp), ErrorCode.SYSTEM_ERROR, "更新应用信息失败");
+
+        // 7-返回URL
+        return String.format("%s/%s", AppConstant.LOCAL_DEPLOY_BASE_URL, dbApp.getDeployKey());
+    }
+
+    @Override
+    public String previewApp(Long appId, HttpServletRequest request) {
+        // 1-查询App校验是否存在 & 是否属于该用户
+        App dbApp = checkAppOwnership(appId, request);
+
+        // 2-获取App代码生成目录
+        String codeGenDir = dbApp.getCodeGenDir();
+        if (StrUtil.isBlank(codeGenDir)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "应用未配置代码生成目录");
+        }
+
+        // 3-校验目录内容，不存在抛异常
+        File previewDir = new File(AppConstant.FILE_SAVE_ROOT_DIR + File.separator + codeGenDir);
+        if (!previewDir.exists()) {
+            throw new BusinessException(ErrorCode.CODE_GENERATE_NOT_FOUND, "代码尚未生成，无法预览");
+        }
+
+        // 3-返回访问URL
+        return String.format("%s/%s", AppConstant.LOCAL_RREVIEW_BASE_URL, codeGenDir);
+    }
+
+    /**
+     * 检查deployKey是否已存在（用于保证唯一性）
+     */
+    private boolean existsByDeployKey(String deployKey) {
+        App existing = getOne(new QueryWrapper().eq("deployKey", deployKey));
+        return existing != null;
     }
 
 

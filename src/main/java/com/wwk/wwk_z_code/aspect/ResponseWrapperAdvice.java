@@ -1,6 +1,7 @@
 package com.wwk.wwk_z_code.aspect;
 
 import cn.hutool.json.JSONUtil;
+import com.wwk.wwk_z_code.annotation.IgnoreResultWrapper;
 import com.wwk.wwk_z_code.common.BaseResponse;
 import com.wwk.wwk_z_code.common.ResponseUtils;
 import org.springframework.core.MethodParameter;
@@ -22,6 +23,11 @@ public class ResponseWrapperAdvice implements ResponseBodyAdvice<Object> {
     // 包装条件，编译判定符合条件的才会触发包装
     @Override
     public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
+        // 注解不包装
+        if (returnType.hasMethodAnnotation(IgnoreResultWrapper.class) || returnType.getContainingClass().isAnnotationPresent(IgnoreResultWrapper.class)) {
+            return false;
+        }
+
         // 非包装类型就包装
         return returnType.getParameterType() != BaseResponse.class;
     }

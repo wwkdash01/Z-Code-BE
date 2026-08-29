@@ -9,7 +9,8 @@ public enum ErrorCode {
     NOT_LOGIN_ERROR(40100, "未登录"),
     FORBIDDEN_ERROR(40300, "禁止访问"),
     SYSTEM_ERROR(50000, "系统错误"),
-    CODE_GENERATE_ERROR(50001, "代码生成失败");
+    CODE_GENERATE_ERROR(50001, "代码生成失败"),
+    CODE_GENERATE_NOT_FOUND(50002, "代码未找到");
 
 
     /**

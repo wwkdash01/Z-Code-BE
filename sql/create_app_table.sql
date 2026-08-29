@@ -14,7 +14,8 @@ create table if not exists app
     priority        int          default 0                 not null comment '应用展示优先级',
 
     deployKey       varchar(64)                            null     comment '应用部署密钥',
-    deployTime      datetime                               null comment '应用部署时间',
+    deployDir       varchar(256)                           null     comment '应用部署目录',
+    deployTime      datetime                               null     comment '应用部署时间',
 
     createUserId    bigint                                 not null comment '创建用户id',
 

@@ -144,7 +144,7 @@ public class AppController {
     }
 
     /**
-     * 获取代码生成输出流
+     * 获取代码生成输出流(USER)
      *
      * @param appCodeStreamQueryDTO 代码输出流请求DTO
      * @param request Http请求
@@ -171,6 +171,31 @@ public class AppController {
                             .data("")
                             .build()
                 ));
+    }
+
+    /**
+     * 部署应用(USER)
+     *
+     * @param appDeployRequestDTO 部署应用请求DTO
+     * @return 网页访问站点URL
+     */
+    @PostMapping("/user/deployment")
+    public String deployApp(
+            @RequestBody
+            @Valid
+            AppDeployRequestDTO appDeployRequestDTO,
+            HttpServletRequest request) {
+        return appService.deployApp(appDeployRequestDTO, request);
+    }
+
+    @GetMapping("/user/preview/{appId}")
+    public String previewApp(
+            @PathVariable
+            @NotNull
+            @Min(value = 1L, message = "应用id不能小于1")
+            Long appId,
+            HttpServletRequest request) {
+        return appService.previewApp(appId, request);
     }
 
     /**
