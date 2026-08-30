@@ -5,6 +5,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.wwk.wwk_z_code.core.AiCodeGeneratorFacade;
 import com.wwk.wwk_z_code.exception.BusinessException;
 import com.wwk.wwk_z_code.exception.ErrorCode;
+import com.wwk.wwk_z_code.mapper.UserMapper;
 import com.wwk.wwk_z_code.model.dto.AppAddRequestDTO;
 import com.wwk.wwk_z_code.model.dto.AppAdminQueryRequestDTO;
 import com.wwk.wwk_z_code.model.dto.AppAdminUpdateRequestDTO;
@@ -12,7 +13,9 @@ import com.wwk.wwk_z_code.model.dto.AppCodeStreamQueryDTO;
 import com.wwk.wwk_z_code.model.dto.AppQueryRequestDTO;
 import com.wwk.wwk_z_code.model.dto.AppUpdateRequestDTO;
 import com.wwk.wwk_z_code.model.entity.App;
+import com.wwk.wwk_z_code.model.entity.User;
 import com.wwk.wwk_z_code.model.enums.CodeGenEnum;
+import com.wwk.wwk_z_code.model.enums.TagEnum;
 import com.wwk.wwk_z_code.model.vo.AppVO;
 import com.wwk.wwk_z_code.model.vo.UserVO;
 import com.wwk.wwk_z_code.service.impl.AppServiceImpl;
@@ -27,10 +30,12 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Flux;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static com.wwk.wwk_z_code.constant.UserConstant.USER_LOGIN_STATUS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -40,13 +45,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * AppServiceImpl.getCodeGenStream 单元测试：USER 角色 + 归属校验（存在/属于当前用户）→ 透传 facade 流式生成。
+ * AppServiceImpl 单元测试：覆盖用户接口、管理员接口以及 appTag / createTime / 创建人信息补充等逻辑。
  */
 @ExtendWith(MockitoExtension.class)
 class AppServiceImplTest {
 
     @Mock
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
+
+    @Mock
+    private UserMapper userMapper;
 
     @Mock
     private HttpServletRequest request;
@@ -58,9 +66,10 @@ class AppServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        // AppServiceImpl 由 @RequiredArgsConstructor 注入 facade；spy 上 stub 继承方法 getById
-        service = Mockito.spy(new AppServiceImpl(aiCodeGeneratorFacade));
+        service = Mockito.spy(new AppServiceImpl(aiCodeGeneratorFacade, userMapper));
     }
+
+    // region 私有工具方法测试
 
     @Test
     void getCodeGenStream_ownerSuccess_returnsFacadeStream() {
@@ -112,6 +121,8 @@ class AppServiceImplTest {
         assertEquals("无权访问该应用", e.getMessage());
     }
 
+    // endregion
+
     // region 用户业务方法
 
     @Test
@@ -123,6 +134,7 @@ class AppServiceImplTest {
         dto.setAppName("我的博客");
         dto.setInitPrompt("做个博客");
         dto.setCodeGenType(CodeGenEnum.SINGLETON_HTML);
+        dto.setAppTag(TagEnum.TOOL);
 
         service.saveApp(dto, request);
 
@@ -134,6 +146,7 @@ class AppServiceImplTest {
         assertEquals(0, saved.getPriority());
         assertEquals(1L, saved.getCreateUserId());
         assertNull(saved.getDeployKey());
+        assertEquals(TagEnum.TOOL, saved.getAppTag());
     }
 
     @Test
@@ -152,18 +165,39 @@ class AppServiceImplTest {
     }
 
     @Test
-    void getAppById_success_returnsMaskedVO() {
+    void getAppById_success_returnsMaskedVO_withCreatorInfo() {
         loginAs(1L);
-        doReturn(App.builder().id(100L).appName("我的博客").cover("http://c").initPrompt("p")
-                        .codeGenType(CodeGenEnum.MULTIFILE_HTML).priority(99).deployKey("k").createUserId(1L).build())
-                .when(service).getById(100L);
+        App app = App.builder().id(100L).appName("我的博客").cover("http://c")
+                .initPrompt("p").codeGenType(CodeGenEnum.MULTIFILE_HTML)
+                .appTag(TagEnum.WEB_PAGE).priority(99).deployKey("k")
+                .createUserId(1L).createTime(LocalDateTime.now()).build();
+        doReturn(app).when(service).getById(100L);
+        User creator = User.builder().id(1L).userName("tester").userAvatar("http://avatar").build();
+        when(userMapper.selectOneById(1L)).thenReturn(creator);
 
         AppVO vo = service.getAppById(100L, request);
 
         assertEquals(100L, vo.getId());
         assertEquals("我的博客", vo.getAppName());
         assertEquals(CodeGenEnum.MULTIFILE_HTML, vo.getCodeGenType());
-        // AppVO 结构本身不含 priority/deployKey/审计字段，脱敏由 VO 结构保证
+        assertEquals(TagEnum.WEB_PAGE, vo.getAppTag());
+        assertNotNull(vo.getCreateTime());
+        assertEquals("tester", vo.getUserName());
+        assertEquals("http://avatar", vo.getUserAvatar());
+    }
+
+    @Test
+    void getAppById_creatorDeleted_returnsVO_withoutUserInfo() {
+        loginAs(1L);
+        App app = App.builder().id(100L).appName("我的博客").createUserId(1L).build();
+        doReturn(app).when(service).getById(100L);
+        when(userMapper.selectOneById(1L)).thenReturn(null);
+
+        AppVO vo = service.getAppById(100L, request);
+
+        assertEquals(100L, vo.getId());
+        assertNull(vo.getUserName());
+        assertNull(vo.getUserAvatar());
     }
 
     @Test
@@ -195,11 +229,15 @@ class AppServiceImplTest {
     }
 
     @Test
-    void getMyAppByPage_success_returnsPagedVO() {
+    void getMyAppByPage_success_returnsPagedVO_withCreatorInfo() {
         loginAs(1L);
-        App app = App.builder().id(100L).appName("我的应用").codeGenType(CodeGenEnum.SINGLETON_HTML).build();
+        LocalDateTime now = LocalDateTime.now();
+        App app = App.builder().id(100L).appName("我的应用").codeGenType(CodeGenEnum.SINGLETON_HTML)
+                .createUserId(1L).createTime(now).build();
         Page<App> dbPage = new Page<>(List.of(app), 1, 10, 1);
         doReturn(dbPage).when(service).page(any(Page.class), any(QueryWrapper.class));
+        User creator = User.builder().id(1L).userName("tester").userAvatar("http://avatar").build();
+        when(userMapper.selectOneById(1L)).thenReturn(creator);
 
         AppQueryRequestDTO dto = new AppQueryRequestDTO();
         dto.setSortField("appName");
@@ -210,6 +248,9 @@ class AppServiceImplTest {
         assertEquals(1, result.getRecords().size());
         assertEquals("我的应用", result.getRecords().get(0).getAppName());
         assertEquals(CodeGenEnum.SINGLETON_HTML, result.getRecords().get(0).getCodeGenType());
+        assertEquals(now, result.getRecords().get(0).getCreateTime());
+        assertEquals("tester", result.getRecords().get(0).getUserName());
+        assertEquals("http://avatar", result.getRecords().get(0).getUserAvatar());
     }
 
     @Test
@@ -225,14 +266,23 @@ class AppServiceImplTest {
 
     @Test
     void getFeaturedAppByPage_success_returnsPagedVO() {
-        App app = App.builder().id(100L).appName("精选应用").codeGenType(CodeGenEnum.MULTIFILE_HTML).build();
+        LocalDateTime now = LocalDateTime.now();
+        App app = App.builder().id(100L).appName("精选应用").codeGenType(CodeGenEnum.MULTIFILE_HTML)
+                .createUserId(1L).createTime(now).build();
         Page<App> dbPage = new Page<>(List.of(app), 1, 10, 1);
         doReturn(dbPage).when(service).page(any(Page.class), any(QueryWrapper.class));
+        User creator = User.builder().id(1L).userName("admin").userAvatar("http://av").build();
+        when(userMapper.selectOneById(1L)).thenReturn(creator);
 
-        Page<AppVO> result = service.getFeaturedAppByPage(new AppQueryRequestDTO());
+        AppQueryRequestDTO dto = new AppQueryRequestDTO();
+        dto.setSortField("appName");
+
+        Page<AppVO> result = service.getFeaturedAppByPage(dto);
 
         assertEquals(1, result.getRecords().size());
         assertEquals("精选应用", result.getRecords().get(0).getAppName());
+        assertEquals(now, result.getRecords().get(0).getCreateTime());
+        assertEquals("admin", result.getRecords().get(0).getUserName());
     }
 
     // endregion
@@ -241,7 +291,7 @@ class AppServiceImplTest {
 
     @Test
     void getAppByAdmin_success_returnsPO() {
-        doReturn(App.builder().id(100L).appName("管理视角").priority(99).deployKey("k").build())
+        doReturn(App.builder().id(100L).appName("管理视角").priority(99).deployKey("k").appTag(TagEnum.PROFILE).build())
                 .when(service).getById(100L);
 
         App po = service.getAppByAdmin(100L);
@@ -249,6 +299,7 @@ class AppServiceImplTest {
         assertEquals(100L, po.getId());
         assertEquals(99, po.getPriority());
         assertEquals("k", po.getDeployKey());
+        assertEquals(TagEnum.PROFILE, po.getAppTag());
     }
 
     @Test
@@ -261,7 +312,7 @@ class AppServiceImplTest {
     }
 
     @Test
-    void updateAppByAdmin_success_updatesOnlyProvidedFields() {
+    void updateAppByAdmin_success_updatesOnlyProvidedFields_includingAppTag() {
         doReturn(App.builder().id(100L).appName("旧名").cover("http://old").priority(0).build())
                 .when(service).getById(100L);
         doReturn(true).when(service).updateById(any(App.class));
@@ -269,6 +320,7 @@ class AppServiceImplTest {
         AppAdminUpdateRequestDTO dto = new AppAdminUpdateRequestDTO();
         dto.setAppName("新名");
         dto.setPriority(99);
+        dto.setAppTag(TagEnum.TOOL);
 
         assertTrue(service.updateAppByAdmin(dto, 100L));
 
@@ -277,6 +329,7 @@ class AppServiceImplTest {
         App updated = captor.getValue();
         assertEquals("新名", updated.getAppName());
         assertEquals(99, updated.getPriority());
+        assertEquals(TagEnum.TOOL, updated.getAppTag());
     }
 
     @Test
@@ -305,6 +358,35 @@ class AppServiceImplTest {
     }
 
     @Test
+    void getAppByAdminPage_success_filterByAppTag() {
+        App app = App.builder().id(100L).appName("工具应用").appTag(TagEnum.TOOL).build();
+        Page<App> dbPage = new Page<>(List.of(app), 1, 10, 1);
+        doReturn(dbPage).when(service).page(any(Page.class), any(QueryWrapper.class));
+
+        AppAdminQueryRequestDTO dto = new AppAdminQueryRequestDTO();
+        dto.setAppTag(TagEnum.TOOL);
+
+        Page<App> result = service.getAppByAdminPage(dto);
+
+        assertEquals(1, result.getRecords().size());
+        assertEquals("工具应用", result.getRecords().get(0).getAppName());
+    }
+
+    @Test
+    void getAppByAdminPage_success_sortByAppTag() {
+        App app = App.builder().id(100L).appName("排序测试").build();
+        Page<App> dbPage = new Page<>(List.of(app), 1, 10, 1);
+        doReturn(dbPage).when(service).page(any(Page.class), any(QueryWrapper.class));
+
+        AppAdminQueryRequestDTO dto = new AppAdminQueryRequestDTO();
+        dto.setSortField("appTag");
+
+        Page<App> result = service.getAppByAdminPage(dto);
+
+        assertEquals(1, result.getRecords().size());
+    }
+
+    @Test
     void getAppByAdminPage_invalidCodeGenType_throwsParamError() {
         AppAdminQueryRequestDTO dto = new AppAdminQueryRequestDTO();
         dto.setCodeGenType("xxx");
@@ -326,7 +408,7 @@ class AppServiceImplTest {
 
     // endregion
 
-    // region 私有工具方法
+    // region 辅助方法
 
     private void loginAs(Long userId) {
         when(request.getSession(false)).thenReturn(session);

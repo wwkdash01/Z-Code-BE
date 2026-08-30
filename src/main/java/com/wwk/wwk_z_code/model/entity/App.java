@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.io.Serial;
 
 import com.mybatisflex.core.keygen.KeyGenerators;
+import com.wwk.wwk_z_code.model.enums.TagEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -52,6 +53,13 @@ public class App implements Serializable {
     @Sortable
     @Column("cover")
     private String cover;
+
+    /**
+     * 应用标签
+     */
+    @Sortable
+    @Column("appTag")
+    private TagEnum appTag;
 
     /**
      * 应用初始化提示词

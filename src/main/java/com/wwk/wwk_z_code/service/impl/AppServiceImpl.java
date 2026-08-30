@@ -16,9 +16,12 @@ import com.wwk.wwk_z_code.core.AiCodeGeneratorFacade;
 import com.wwk.wwk_z_code.exception.BusinessException;
 import com.wwk.wwk_z_code.exception.ErrorCode;
 import com.wwk.wwk_z_code.mapper.AppMapper;
+import com.wwk.wwk_z_code.mapper.UserMapper;
 import com.wwk.wwk_z_code.model.dto.*;
 import com.wwk.wwk_z_code.model.entity.App;
+import com.wwk.wwk_z_code.model.entity.User;
 import com.wwk.wwk_z_code.model.enums.CodeGenEnum;
+import com.wwk.wwk_z_code.model.enums.TagEnum;
 import com.wwk.wwk_z_code.model.enums.UserRoleEnum;
 import com.wwk.wwk_z_code.model.vo.AppVO;
 import com.wwk.wwk_z_code.model.vo.UserVO;
@@ -50,6 +53,7 @@ import static com.wwk.wwk_z_code.constant.UserConstant.USER_LOGIN_STATUS;
 public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppService {
 
     private final AiCodeGeneratorFacade aiCodeGeneratorFacade;
+    private final UserMapper userMapper;
 
     // region 用户接口
 
@@ -283,6 +287,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             queryWrapper.eq("codeGenType", codeGenEnum.getCodeGenMode());
         }
 
+        // appTag 查询条件：通过 tag 字符串值匹配
+        String appTag = getTagEnumValue(appAdminQueryRequestDTO.getAppTag());
+        if (StrUtil.isNotBlank(appTag)) {
+            queryWrapper.eq("appTag", appTag);
+        }
+
         // 3-封装排序
         if (StrUtil.isNotBlank(appAdminQueryRequestDTO.getSortField())) {
             queryWrapper.orderBy(appAdminQueryRequestDTO.getSortField(), "ascend".equals(appAdminQueryRequestDTO.getSortOrder()));
@@ -464,13 +474,23 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     }
 
     /**
-     * PO转脱敏VO（仅保留 id/appName/cover/initPrompt/codeGenType）
+     * PO转脱敏VO（剔除 priority/deployKey/审计字段，补充创建人信息）
      * @param app 应用实体
      * @return 应用视图对象
      */
     private AppVO toAppVO(App app) {
         AppVO appVO = new AppVO();
         BeanUtils.copyProperties(app, appVO);
+
+        // 补充创建人用户名和头像
+        if (app.getCreateUserId() != null) {
+            User creator = userMapper.selectOneById(app.getCreateUserId());
+            if (creator != null) {
+                appVO.setUserName(creator.getUserName());
+                appVO.setUserAvatar(creator.getUserAvatar());
+            }
+        }
+
         return appVO;
     }
 
@@ -484,6 +504,15 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                 .map(this::toAppVO)
                 .collect(Collectors.toList());
         return new Page<>(voRecords, appPage.getPageNumber(), appPage.getPageSize(), appPage.getTotalRow());
+    }
+
+    /**
+     * 枚举转 tag 存储值，null 或空时返回 null
+     * @param tagEnum 标签枚举
+     * @return tag 字符串
+     */
+    private static String getTagEnumValue(TagEnum tagEnum) {
+        return tagEnum != null ? tagEnum.getTag() : null;
     }
 
     // endregion

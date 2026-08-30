@@ -3,6 +3,7 @@ package com.wwk.wwk_z_code.controller;
 import com.mybatisflex.core.paginate.Page;
 import com.wwk.wwk_z_code.model.entity.App;
 import com.wwk.wwk_z_code.model.enums.CodeGenEnum;
+import com.wwk.wwk_z_code.model.enums.TagEnum;
 import com.wwk.wwk_z_code.model.vo.AppVO;
 import com.wwk.wwk_z_code.service.AppService;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.MockMvc;
 import reactor.core.publisher.Flux;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
@@ -48,10 +50,15 @@ class AppControllerTest {
 
     @Test
     void featured_success_returnsPagedAppVO() throws Exception {
+        LocalDateTime now = LocalDateTime.now();
         AppVO vo = new AppVO();
         vo.setId(1L);
         vo.setAppName("精选博客");
         vo.setCodeGenType(CodeGenEnum.SINGLETON_HTML);
+        vo.setAppTag(TagEnum.WEB_PAGE);
+        vo.setCreateTime(now);
+        vo.setUserName("admin");
+        vo.setUserAvatar("http://avatar");
         Page<AppVO> page = new Page<>(List.of(vo), 1, 10, 1);
         when(appService.getFeaturedAppByPage(any())).thenReturn(page);
 
@@ -59,8 +66,11 @@ class AppControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.records[0].appName").value("精选博客"))
-                // CodeGenEnum 经 @JsonValue 序列化为 codeGenMode 值
-                .andExpect(jsonPath("$.data.records[0].codeGenType").value("singleton"));
+                .andExpect(jsonPath("$.data.records[0].codeGenType").value("singleton"))
+                .andExpect(jsonPath("$.data.records[0].appTag").value("webPage"))
+                .andExpect(jsonPath("$.data.records[0].createTime").exists())
+                .andExpect(jsonPath("$.data.records[0].userName").value("admin"))
+                .andExpect(jsonPath("$.data.records[0].userAvatar").value("http://avatar"));
 
         verify(appService).getFeaturedAppByPage(any());
     }
@@ -84,6 +94,20 @@ class AppControllerTest {
         mvc.perform(post("/apps/user")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"appName\":\"我的博客\",\"initPrompt\":\"做一个博客\",\"codeGenType\":\"singleton\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data").value(1000));
+
+        verify(appService).saveApp(any(), any());
+    }
+
+    @Test
+    void saveApp_withAppTag_savesSuccessfully() throws Exception {
+        when(appService.saveApp(any(), any())).thenReturn(1000L);
+
+        mvc.perform(post("/apps/user")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"appName\":\"工具站\",\"initPrompt\":\"做一个工具\",\"codeGenType\":\"singleton\",\"appTag\":\"tool\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").value(1000));
@@ -117,17 +141,25 @@ class AppControllerTest {
 
     @Test
     void getAppVOById_success_returnsAppVO() throws Exception {
+        LocalDateTime now = LocalDateTime.now();
         AppVO vo = new AppVO();
         vo.setId(1L);
         vo.setAppName("我的博客");
         vo.setCodeGenType(CodeGenEnum.MULTIFILE_HTML);
+        vo.setAppTag(TagEnum.TOOL);
+        vo.setCreateTime(now);
+        vo.setUserName("tester");
+        vo.setUserAvatar("http://avatar");
         when(appService.getAppById(eq(1L), any())).thenReturn(vo);
 
         mvc.perform(get("/apps/user/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.appName").value("我的博客"))
-                .andExpect(jsonPath("$.data.codeGenType").value("multifile"));
+                .andExpect(jsonPath("$.data.codeGenType").value("multifile"))
+                .andExpect(jsonPath("$.data.appTag").value("tool"))
+                .andExpect(jsonPath("$.data.userName").value("tester"))
+                .andExpect(jsonPath("$.data.userAvatar").value("http://avatar"));
     }
 
     @Test
@@ -190,16 +222,21 @@ class AppControllerTest {
 
     @Test
     void myApps_success_returnsPagedAppVO() throws Exception {
+        LocalDateTime now = LocalDateTime.now();
         AppVO vo = new AppVO();
         vo.setId(1L);
         vo.setAppName("我的博客");
+        vo.setCreateTime(now);
+        vo.setUserName("owner");
+        vo.setUserAvatar("http://av");
         Page<AppVO> page = new Page<>(List.of(vo), 1, 10, 1);
         when(appService.getMyAppByPage(any(), any())).thenReturn(page);
 
         mvc.perform(get("/apps/user/page/my-apps"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.records[0].appName").value("我的博客"));
+                .andExpect(jsonPath("$.data.records[0].appName").value("我的博客"))
+                .andExpect(jsonPath("$.data.records[0].userName").value("owner"));
 
         verify(appService).getMyAppByPage(any(), any());
     }
@@ -217,14 +254,15 @@ class AppControllerTest {
 
     @Test
     void getAppByAdmin_success_returnsApp() throws Exception {
-        App app = App.builder().id(1L).appName("管理视角").codeGenType(CodeGenEnum.SINGLETON_HTML).build();
+        App app = App.builder().id(1L).appName("管理视角").codeGenType(CodeGenEnum.SINGLETON_HTML).appTag(TagEnum.PROFILE).build();
         when(appService.getAppByAdmin(1L)).thenReturn(app);
 
         mvc.perform(get("/apps/admin/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.appName").value("管理视角"))
-                .andExpect(jsonPath("$.data.codeGenType").value("singleton"));
+                .andExpect(jsonPath("$.data.codeGenType").value("singleton"))
+                .andExpect(jsonPath("$.data.appTag").value("profile"));
     }
 
     @Test
@@ -243,7 +281,7 @@ class AppControllerTest {
 
         mvc.perform(put("/apps/admin/1")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"appName\":\"管理改\",\"cover\":\"http://x\",\"priority\":99}"))
+                        .content("{\"appName\":\"管理改\",\"cover\":\"http://x\",\"priority\":99,\"appTag\":\"webPage\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(true));
 
@@ -298,6 +336,18 @@ class AppControllerTest {
                 .andExpect(jsonPath("$.data.records[0].appName").value("管理视角"));
 
         verify(appService).getAppByAdminPage(any());
+    }
+
+    @Test
+    void adminPage_filterByAppTag_returnsFilteredData() throws Exception {
+        Page<App> page = new Page<>(List.of(App.builder().id(1L).appName("工具").appTag(TagEnum.TOOL).build()), 1, 10, 1);
+        when(appService.getAppByAdminPage(any())).thenReturn(page);
+
+        mvc.perform(get("/apps/admin/page").param("appTag", "tool"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.records[0].appName").value("工具"))
+                .andExpect(jsonPath("$.data.records[0].appTag").value("tool"));
     }
 
     @Test

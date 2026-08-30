@@ -1,6 +1,7 @@
 package com.wwk.wwk_z_code.model.dto;
 
 import com.wwk.wwk_z_code.model.enums.CodeGenEnum;
+import com.wwk.wwk_z_code.model.enums.TagEnum;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import org.hibernate.validator.constraints.Length;
@@ -40,4 +41,9 @@ public class AppAddRequestDTO implements Serializable {
      */
     @NotNull(message = "应用生成类型为空")
     private CodeGenEnum codeGenType;
+
+    /**
+     * 应用标签
+     */
+    private TagEnum appTag;
 }

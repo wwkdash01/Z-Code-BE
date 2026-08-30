@@ -1,5 +1,6 @@
 package com.wwk.wwk_z_code.model.dto;
 
+import com.wwk.wwk_z_code.model.enums.TagEnum;
 import jakarta.validation.constraints.Min;
 import lombok.Data;
 import org.hibernate.validator.constraints.Length;
@@ -32,4 +33,9 @@ public class AppAdminUpdateRequestDTO implements Serializable {
      */
     @Min(value = 0, message = "优先级不能小于0")
     private Integer priority;
+
+    /**
+     * 应用标签
+     */
+    private TagEnum appTag;
 }

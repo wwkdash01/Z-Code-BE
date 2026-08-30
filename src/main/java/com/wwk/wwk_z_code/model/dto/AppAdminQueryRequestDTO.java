@@ -2,6 +2,7 @@ package com.wwk.wwk_z_code.model.dto;
 
 import cn.hutool.core.util.StrUtil;
 import com.wwk.wwk_z_code.common.PageRequest;
+import com.wwk.wwk_z_code.model.enums.TagEnum;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
 import lombok.Data;
@@ -59,6 +60,11 @@ public class AppAdminQueryRequestDTO extends PageRequest implements Serializable
     private Integer priority;
 
     /**
+     * 应用标签
+     */
+    private TagEnum appTag;
+
+    /**
      * 应用部署密钥
      */
     @Length(max = 64, message = "应用部署密钥过长")
@@ -74,7 +80,7 @@ public class AppAdminQueryRequestDTO extends PageRequest implements Serializable
      * 管理员可排序字段白名单（App 实体非审计字段）
      */
     private static final Set<String> SORTABLE_FIELDS = Set.of(
-            "id", "appName", "cover", "initPrompt", "codeGenType", "priority", "deployKey", "deployTime");
+            "id", "appName", "cover", "initPrompt", "codeGenType", "appTag", "priority", "deployKey", "deployTime");
 
     /**
      * 校验排序字段：仅允许为空或在管理员可排序白名单内

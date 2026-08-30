@@ -30,29 +30,24 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-### VS Code ###
+### VS Code & 前端 ###
 .vscode/
+/wwk_frontend/
 
-# 本地配置（含数据库密码 / API key，不提交）
+### 本地配置（含数据库密码 / API key，不提交）###
 /src/main/resources/application.yaml
 /src/main/resources/application-local.yaml
 
-# 前端项目（独立仓库，后续单独处理）
-/wwk_z_code/
+###  claude ###
+/.claude
 
-# 根目录误生成的空 lock 文件
-/package-lock.json
-
-# 代码生成输出目录（运行生成）
-/tmp/
-
-# 本地 Claude 配置
-/.claude/
-
-# macOS
-.DS_Store
-
-# 公开展示仓库不包含（保留本地）
+### 公开展示仓库不包含（保留本地）###
 /.gitattributes
 /data-analysis-integration.md
 /plan/
+/package-lock.json
+
+###  代码生成目录 ###
+/tmp
+
+
