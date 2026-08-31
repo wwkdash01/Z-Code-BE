@@ -248,6 +248,46 @@ class AppControllerTest {
                 .andExpect(jsonPath("$.code").value(40000));
     }
 
+    @Test
+    void myApps_appTag_filterWorks() throws Exception {
+        // appTag=tool 是合法值，binding 通过，service mock 返回结果
+        LocalDateTime now = LocalDateTime.now();
+        AppVO vo = new AppVO();
+        vo.setId(1L);
+        vo.setAppName("我的博客");
+        vo.setCreateTime(now);
+        vo.setUserName("owner");
+        vo.setUserAvatar("http://av");
+        Page<AppVO> page = new Page<>(List.of(vo), 1, 10, 1);
+        when(appService.getMyAppByPage(any(), any())).thenReturn(page);
+
+        mvc.perform(get("/apps/user/page/my-apps").param("appTag", "tool"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.records[0].appName").value("我的博客"));
+
+        verify(appService).getMyAppByPage(any(), any());
+    }
+
+    @Test
+    void featured_appTag_passesBinding() throws Exception {
+        // guest 接口 appTag 不抛异常，正常进入 Service
+        LocalDateTime now = LocalDateTime.now();
+        AppVO vo = new AppVO();
+        vo.setId(1L);
+        vo.setAppName("精选博客");
+        vo.setCreateTime(now);
+        Page<AppVO> page = new Page<>(List.of(vo), 1, 10, 1);
+        when(appService.getFeaturedAppByPage(any())).thenReturn(page);
+
+        mvc.perform(get("/apps/guest/page/featured").param("appTag", "invalid_tag"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.records[0].appName").value("精选博客"));
+
+        verify(appService).getFeaturedAppByPage(any());
+    }
+
     // endregion
 
     // region getAppByAdmin (GET /apps/admin/{id})

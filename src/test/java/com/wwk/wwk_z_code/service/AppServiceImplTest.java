@@ -364,7 +364,7 @@ class AppServiceImplTest {
         doReturn(dbPage).when(service).page(any(Page.class), any(QueryWrapper.class));
 
         AppAdminQueryRequestDTO dto = new AppAdminQueryRequestDTO();
-        dto.setAppTag(TagEnum.TOOL);
+        dto.setAppTag("tool");
 
         Page<App> result = service.getAppByAdminPage(dto);
 

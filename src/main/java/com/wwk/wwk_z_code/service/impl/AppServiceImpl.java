@@ -160,7 +160,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         QueryWrapper queryWrapper = new QueryWrapper();
         queryWrapper
                 .eq("createUserId", currentUser.getId())
-                .like("appName", appQueryRequestDTO.getAppName(), StrUtil.isNotBlank(appQueryRequestDTO.getAppName()));
+                .like("appName", appQueryRequestDTO.getAppName(), StrUtil.isNotBlank(appQueryRequestDTO.getAppName()))
+                .eq("appTag", appQueryRequestDTO.getAppTag(), StrUtil.isNotBlank(appQueryRequestDTO.getAppTag()));
 
         // 4-封装排序（用户分页仅支持 appName，未传不排序）
         if (StrUtil.isNotBlank(appQueryRequestDTO.getSortField())) {
@@ -187,7 +188,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         QueryWrapper queryWrapper = new QueryWrapper();
         queryWrapper
                 .eq("priority", 99)
-                .like("appName", appQueryRequestDTO.getAppName(), StrUtil.isNotBlank(appQueryRequestDTO.getAppName()));
+                .like("appName", appQueryRequestDTO.getAppName(), StrUtil.isNotBlank(appQueryRequestDTO.getAppName()))
+                .eq("appTag", appQueryRequestDTO.getAppTag(), StrUtil.isNotBlank(appQueryRequestDTO.getAppTag()));
 
         // 3-封装排序（精选分页仅支持 appName，未传不排序）
         if (StrUtil.isNotBlank(appQueryRequestDTO.getSortField())) {
@@ -287,11 +289,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             queryWrapper.eq("codeGenType", codeGenEnum.getCodeGenMode());
         }
 
-        // appTag 查询条件：通过 tag 字符串值匹配
-        String appTag = getTagEnumValue(appAdminQueryRequestDTO.getAppTag());
-        if (StrUtil.isNotBlank(appTag)) {
-            queryWrapper.eq("appTag", appTag);
-        }
+        // appTag 查询条件：直接按 tag 字符串匹配
+        queryWrapper.eq("appTag", appAdminQueryRequestDTO.getAppTag(), StrUtil.isNotBlank(appAdminQueryRequestDTO.getAppTag()));
 
         // 3-封装排序
         if (StrUtil.isNotBlank(appAdminQueryRequestDTO.getSortField())) {
@@ -504,15 +503,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                 .map(this::toAppVO)
                 .collect(Collectors.toList());
         return new Page<>(voRecords, appPage.getPageNumber(), appPage.getPageSize(), appPage.getTotalRow());
-    }
-
-    /**
-     * 枚举转 tag 存储值，null 或空时返回 null
-     * @param tagEnum 标签枚举
-     * @return tag 字符串
-     */
-    private static String getTagEnumValue(TagEnum tagEnum) {
-        return tagEnum != null ? tagEnum.getTag() : null;
     }
 
     // endregion

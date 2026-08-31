@@ -2,7 +2,6 @@ package com.wwk.wwk_z_code.model.dto;
 
 import cn.hutool.core.util.StrUtil;
 import com.wwk.wwk_z_code.common.PageRequest;
-import com.wwk.wwk_z_code.model.enums.TagEnum;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
 import lombok.Data;
@@ -60,9 +59,9 @@ public class AppAdminQueryRequestDTO extends PageRequest implements Serializable
     private Integer priority;
 
     /**
-     * 应用标签
+     * 应用标签（用于按标签过滤，空值全量返回）
      */
-    private TagEnum appTag;
+    private String appTag;
 
     /**
      * 应用部署密钥

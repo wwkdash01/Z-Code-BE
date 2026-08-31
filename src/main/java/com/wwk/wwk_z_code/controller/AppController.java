@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springdoc.core.annotations.ParameterObject;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -51,6 +52,7 @@ public class AppController {
     public Page<AppVO> getFeaturedAppByPage(
             @ModelAttribute
             @Valid
+            @ParameterObject
             AppQueryRequestDTO appQueryRequestDTO) {
         return appService.getFeaturedAppByPage(appQueryRequestDTO);
     }
@@ -138,6 +140,7 @@ public class AppController {
     public Page<AppVO> getMyAppByPage(
             @ModelAttribute
             @Valid
+            @ParameterObject
             AppQueryRequestDTO appQueryRequestDTO,
             HttpServletRequest request) {
         return appService.getMyAppByPage(appQueryRequestDTO, request);
@@ -258,6 +261,7 @@ public class AppController {
     public Page<App> getAppByAdminPage(
             @ModelAttribute
             @Valid
+            @ParameterObject
             AppAdminQueryRequestDTO appAdminQueryRequestDTO) {
         return appService.getAppByAdminPage(appAdminQueryRequestDTO);
     }
