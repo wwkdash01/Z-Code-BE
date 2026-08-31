@@ -124,6 +124,7 @@ public class App implements Serializable {
     /**
      * 创建时间
      */
+    @Sortable
     @Column("createTime")
     private LocalDateTime createTime;
 
