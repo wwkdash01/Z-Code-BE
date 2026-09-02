@@ -156,6 +156,7 @@ public class AppController {
     @GetMapping(value = "/user/code-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> getCodeGenStream(
             @Valid
+            @ParameterObject
             AppCodeStreamQueryDTO appCodeStreamQueryDTO,
             HttpServletRequest request) {
 

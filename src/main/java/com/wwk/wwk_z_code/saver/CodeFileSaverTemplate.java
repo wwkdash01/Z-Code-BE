@@ -21,11 +21,11 @@ public abstract class CodeFileSaverTemplate<T> {
 
 
     /**
-     * 内部方法 构造唯一文件路径（根目录+时间戳+随机后缀）
+     * 静态工具方法 构造唯一文件路径（根目录+时间戳+随机后缀）
      *
      * @return 唯一保存目录
      */
-    private static String buildUniqueSaveDir(Long appId) {
+    public static String buildUniqueSaveDir(Long appId) {
         if (appId == null) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "应用id不能为空");
         }

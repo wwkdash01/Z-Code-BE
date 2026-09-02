@@ -1,6 +1,5 @@
 package com.wwk.wwk_z_code.service.impl;
 
-import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
@@ -21,7 +20,6 @@ import com.wwk.wwk_z_code.model.dto.*;
 import com.wwk.wwk_z_code.model.entity.App;
 import com.wwk.wwk_z_code.model.entity.User;
 import com.wwk.wwk_z_code.model.enums.CodeGenEnum;
-import com.wwk.wwk_z_code.model.enums.TagEnum;
 import com.wwk.wwk_z_code.model.enums.UserRoleEnum;
 import com.wwk.wwk_z_code.model.vo.AppVO;
 import com.wwk.wwk_z_code.model.vo.UserVO;
@@ -39,6 +37,7 @@ import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static com.wwk.wwk_z_code.constant.UserConstant.USER_LOGIN_STATUS;
@@ -311,8 +310,18 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 2-获取生成类型
         CodeGenEnum codeGenEnum = dbApp.getCodeGenType();
 
-        // 3-调用门面生成返回
-        return aiCodeGeneratorFacade.generateAndSaveCodeByStream(appCodeStreamQueryDTO.getUserPrompt(), codeGenEnum, dbApp.getId());
+        // 3-调用门面生成返回并回调更新代码生成路径
+        Consumer<String> callback = (saveDir) -> {
+            dbApp.setCodeGenDir(saveDir);
+            this.updateById(dbApp);
+        };
+
+        return aiCodeGeneratorFacade.generateAndSaveCodeByStream(
+                appCodeStreamQueryDTO.getUserPrompt(),
+                codeGenEnum,
+                dbApp.getId(),
+                callback
+        );
     }
 
     @Override

@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * 代码生成门面类
@@ -56,11 +58,17 @@ public class AiCodeGeneratorFacade {
      * @param codeGenEnum 代码生成模式枚举
      * @return LLM 流式输出
      */
-    public Flux<String> generateAndSaveCodeByStream(String userPrompt, CodeGenEnum codeGenEnum, Long appId) throws BusinessException {
+    public Flux<String> generateAndSaveCodeByStream(String userPrompt, CodeGenEnum codeGenEnum, Long appId, Consumer<String> saveDirCallBack) throws BusinessException {
         // 1-参数校验
         if (userPrompt == null || codeGenEnum == null) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "未指定生成模式");
         }
+
+        if (saveDirCallBack == null) {
+            log.warn("未提供目录保存回调,跳过代码生成路径更新");
+        }
+
+        final AtomicReference<File> savedDirRef = new AtomicReference<>();
 
         // 2-分支执行，获取对应模式的流式输出
         Flux<String> llmStream = switch (codeGenEnum) {
@@ -85,6 +93,8 @@ public class AiCodeGeneratorFacade {
                         File savedDir = CodeFileSaverExecutor.saveCode(parsedResult, codeGenEnum, appId);
 
                         log.debug("文件保存成功:{}", savedDir.getAbsolutePath());
+                        savedDirRef.set(savedDir);
+                        saveDirCallBack.accept(savedDir.getAbsolutePath());
                     } catch (Exception e) {
                         log.error("文件保存失败:{}", e.getMessage());
                     }
