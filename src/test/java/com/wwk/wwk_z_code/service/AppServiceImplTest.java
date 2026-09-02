@@ -40,9 +40,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import java.util.function.Consumer;
 
 /**
  * AppServiceImpl 单元测试：覆盖用户接口、管理员接口以及 appTag / createTime / 创建人信息补充等逻辑。
@@ -76,14 +79,14 @@ class AppServiceImplTest {
         loginAs(1L);
         doReturn(App.builder().id(100L).createUserId(1L).codeGenType(CodeGenEnum.SINGLETON_HTML).build())
                 .when(service).getById(100L);
-        when(aiCodeGeneratorFacade.generateAndSaveCodeByStream("做个博客", CodeGenEnum.SINGLETON_HTML, 100L))
+        when(aiCodeGeneratorFacade.generateAndSaveCodeByStream(eq("做个博客"), eq(CodeGenEnum.SINGLETON_HTML), eq(100L), any(Consumer.class)))
                 .thenReturn(Flux.just("a", "b"));
 
         List<String> emitted = service.getCodeGenStream(streamDTO(100L, "做个博客"), request)
                 .collectList().block();
 
         assertEquals(List.of("a", "b"), emitted);
-        verify(aiCodeGeneratorFacade).generateAndSaveCodeByStream("做个博客", CodeGenEnum.SINGLETON_HTML, 100L);
+        verify(aiCodeGeneratorFacade).generateAndSaveCodeByStream(eq("做个博客"), eq(CodeGenEnum.SINGLETON_HTML), eq(100L), any(Consumer.class));
     }
 
     @Test
