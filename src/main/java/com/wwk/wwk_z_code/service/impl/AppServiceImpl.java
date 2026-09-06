@@ -27,6 +27,7 @@ import com.wwk.wwk_z_code.service.AppService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -49,6 +50,7 @@ import static com.wwk.wwk_z_code.constant.UserConstant.USER_LOGIN_STATUS;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppService {
 
     private final AiCodeGeneratorFacade aiCodeGeneratorFacade;
@@ -302,13 +304,16 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     }
 
     @Override
-    @AuthCheck(roleRequirement = UserRoleEnum.USER)
+    @AuthCheck(roleRequirement = UserRoleEnum.GUEST)
     public Flux<String> getCodeGenStream(AppCodeStreamQueryDTO appCodeStreamQueryDTO, HttpServletRequest request) {
+        long t0 = System.currentTimeMillis();
         // 1-校验应用存在 + 归属当前用户（内部含 getById + checkAppExists）
         App dbApp = checkAppOwnership(appCodeStreamQueryDTO.getAppId(), request);
+        log.info("[SSE-TIMING] Service - checkAppOwnership done: t={} (+{}ms)", System.currentTimeMillis(), System.currentTimeMillis() - t0);
 
         // 2-获取生成类型
         CodeGenEnum codeGenEnum = dbApp.getCodeGenType();
+        log.info("[SSE-TIMING] Service - before facade call: t={} (+{}ms)", System.currentTimeMillis(), System.currentTimeMillis() - t0);
 
         // 3-调用门面生成返回并回调更新代码生成路径
         Consumer<String> callback = (saveDir) -> {
@@ -316,12 +321,14 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             this.updateById(dbApp);
         };
 
-        return aiCodeGeneratorFacade.generateAndSaveCodeByStream(
+        Flux<String> result = aiCodeGeneratorFacade.generateAndSaveCodeByStream(
                 appCodeStreamQueryDTO.getUserPrompt(),
                 codeGenEnum,
                 dbApp.getId(),
                 callback
         );
+        log.info("[SSE-TIMING] Service - facade returned Flux: t={}", System.currentTimeMillis());
+        return result;
     }
 
     @Override

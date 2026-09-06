@@ -5,6 +5,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.io.Serial;
 import java.io.Serializable;
 
@@ -21,6 +23,7 @@ public class AppCodeStreamQueryDTO implements Serializable {
      */
     @NotNull
     @Min(value = 1L, message = "应用id不能小于1")
+    @Schema(type = "string", description = "应用主键ID")
     private Long appId;
 
     /**

@@ -59,6 +59,7 @@ public class AiCodeGeneratorFacade {
      * @return LLM 流式输出
      */
     public Flux<String> generateAndSaveCodeByStream(String userPrompt, CodeGenEnum codeGenEnum, Long appId, Consumer<String> saveDirCallBack) throws BusinessException {
+        long t0 = System.currentTimeMillis();
         // 1-参数校验
         if (userPrompt == null || codeGenEnum == null) {
             throw new BusinessException(ErrorCode.PARAM_ERROR, "未指定生成模式");
@@ -69,6 +70,7 @@ public class AiCodeGeneratorFacade {
         }
 
         final AtomicReference<File> savedDirRef = new AtomicReference<>();
+        log.info("[SSE-TIMING] Facade - before AI call: t={}, prompt={}", System.currentTimeMillis(), userPrompt.length());
 
         // 2-分支执行，获取对应模式的流式输出
         Flux<String> llmStream = switch (codeGenEnum) {
@@ -80,23 +82,29 @@ public class AiCodeGeneratorFacade {
             }
         };
 
+        log.info("[SSE-TIMING] Facade - AI call returned Flux: t={} (+{}ms)", System.currentTimeMillis(), System.currentTimeMillis() - t0);
+
         // 3-累积流式输出片段
         StringBuilder stringBuilder = new StringBuilder();
+        java.util.concurrent.atomic.AtomicBoolean firstChunkLogged = new java.util.concurrent.atomic.AtomicBoolean(false);
 
         return llmStream
-                .doOnNext(stringBuilder::append)
+                .doOnNext(chunk -> {
+                    if (firstChunkLogged.compareAndSet(false, true)) {
+                        log.info("[SSE-TIMING] Facade - first chunk arrived: t={} (+{}ms)", System.currentTimeMillis(), System.currentTimeMillis() - t0);
+                    }
+                    stringBuilder.append(chunk);
+                })
+                .doOnError(error -> log.error("LLM流式输出异常", error))
                 .doOnComplete(() -> {
-                    try {
-                        // 4-输出完成后解析并保存
-                        String codeResult = stringBuilder.toString();
-                        Object parsedResult = CodeParserExecutor.executeParse(codeResult, codeGenEnum);
-                        File savedDir = CodeFileSaverExecutor.saveCode(parsedResult, codeGenEnum, appId);
+                    String codeResult = stringBuilder.toString();
+                    Object parsedResult = CodeParserExecutor.executeParse(codeResult, codeGenEnum);
+                    File savedDir = CodeFileSaverExecutor.saveCode(parsedResult, codeGenEnum, appId);
 
-                        log.debug("文件保存成功:{}", savedDir.getAbsolutePath());
-                        savedDirRef.set(savedDir);
+                    log.debug("文件保存成功:{}", savedDir.getAbsolutePath());
+                    savedDirRef.set(savedDir);
+                    if (saveDirCallBack != null) {
                         saveDirCallBack.accept(savedDir.getAbsolutePath());
-                    } catch (Exception e) {
-                        log.error("文件保存失败:{}", e.getMessage());
                     }
                 });
     }

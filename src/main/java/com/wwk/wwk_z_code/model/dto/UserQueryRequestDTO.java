@@ -1,6 +1,7 @@
 package com.wwk.wwk_z_code.model.dto;
 
 import com.wwk.wwk_z_code.common.PageRequest;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -22,6 +23,7 @@ public class UserQueryRequestDTO extends PageRequest implements Serializable {
      * id
      */
     @Min(value = 1L, message = "用户id不合法")
+    @Schema(type = "string", description = "用户主键ID")
     private Long id;
 
     /**
@@ -46,5 +48,6 @@ public class UserQueryRequestDTO extends PageRequest implements Serializable {
      * 会员id
      */
     @Min(value = 1L, message = "会员id不合法")
+    @Schema(type = "string", description = "会员ID")
     private Long vipId;
 }

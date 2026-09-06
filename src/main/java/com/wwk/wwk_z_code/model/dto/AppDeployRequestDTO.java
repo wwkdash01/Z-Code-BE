@@ -4,6 +4,8 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.io.Serial;
 import java.io.Serializable;
 
@@ -25,5 +27,6 @@ public class AppDeployRequestDTO implements Serializable {
      */
     @NotNull
     @Min(value = 1L, message = "应用ID不能小于1")
+    @Schema(type = "string", description = "应用主键ID")
     private Long appId;
 }

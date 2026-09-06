@@ -5,6 +5,8 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import org.hibernate.validator.constraints.Length;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -70,6 +72,7 @@ public class UserAddRequestDTO implements Serializable {
      * 会员id
      */
     @Min(value = 1L, message = "会员id不合法")
+    @Schema(type = "string", description = "会员ID")
     private Long vipId;
 
     /**
@@ -82,5 +85,6 @@ public class UserAddRequestDTO implements Serializable {
      * 邀请用户id
      */
     @Min(value = 1L, message = "邀请用户id不合法")
+    @Schema(type = "string", description = "邀请人ID")
     private Long inviteUser;
 }

@@ -2,6 +2,7 @@ package com.wwk.wwk_z_code.model.vo;
 
 import com.wwk.wwk_z_code.model.enums.CodeGenEnum;
 import com.wwk.wwk_z_code.model.enums.TagEnum;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.io.Serial;
@@ -25,6 +26,7 @@ public class AppVO implements Serializable {
     /**
      * id
      */
+    @Schema(type = "string", description = "应用主键ID")
     private Long id;
 
     /**

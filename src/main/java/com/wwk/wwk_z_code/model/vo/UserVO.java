@@ -2,6 +2,8 @@ package com.wwk.wwk_z_code.model.vo;
 
 import lombok.Data;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -23,6 +25,7 @@ public class UserVO implements Serializable {
     /**
      * id
      */
+    @Schema(type = "string", description = "用户主键ID")
     private Long id;
 
     /**
@@ -58,6 +61,7 @@ public class UserVO implements Serializable {
     /**
      * 会员id
      */
+    @Schema(type = "string", description = "会员ID")
     private Long vipId;
 
     /**
@@ -68,6 +72,7 @@ public class UserVO implements Serializable {
     /**
      * 邀请用户id
      */
+    @Schema(type = "string", description = "邀请人ID")
     private Long inviteUser;
 
     /**

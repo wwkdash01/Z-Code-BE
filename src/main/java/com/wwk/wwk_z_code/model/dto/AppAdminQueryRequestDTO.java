@@ -2,6 +2,7 @@ package com.wwk.wwk_z_code.model.dto;
 
 import cn.hutool.core.util.StrUtil;
 import com.wwk.wwk_z_code.common.PageRequest;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
 import lombok.Data;
@@ -27,6 +28,7 @@ public class AppAdminQueryRequestDTO extends PageRequest implements Serializable
      * id
      */
     @Min(value = 1L, message = "应用id不合法")
+    @Schema(type = "string", description = "应用主键ID")
     private Long id;
 
     /**

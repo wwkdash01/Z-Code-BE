@@ -1,6 +1,7 @@
 package com.wwk.wwk_z_code.model.entity;
 
 import com.mybatisflex.annotation.Column;
+import io.swagger.v3.oas.annotations.media.Schema;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
@@ -36,6 +37,7 @@ public class User implements Serializable {
      */
     @Sortable
     @Id(keyType = KeyType.Generator, value = KeyGenerators.snowFlakeId)
+    @Schema(type = "string", description = "用户主键ID")
     private Long id;
 
     /**
@@ -94,6 +96,7 @@ public class User implements Serializable {
      */
     @Sortable
     @Column("vipId")
+    @Schema(type = "string", description = "会员ID")
     private Long vipId;
 
     /**
@@ -106,6 +109,7 @@ public class User implements Serializable {
      * 邀请用户id
      */
     @Column("inviteUser")
+    @Schema(type = "string", description = "邀请人ID")
     private Long inviteUser;
 
     /**

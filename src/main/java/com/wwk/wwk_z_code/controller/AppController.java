@@ -5,12 +5,14 @@ import com.mybatisflex.core.paginate.Page;
 import com.wwk.wwk_z_code.model.dto.*;
 import com.wwk.wwk_z_code.model.entity.App;
 import com.wwk.wwk_z_code.model.vo.AppVO;
+import com.wwk.wwk_z_code.exception.ErrorCode;
 import com.wwk.wwk_z_code.service.AppService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.validation.annotation.Validated;
@@ -34,6 +36,7 @@ import java.util.Map;
  *
  * @author wwk
  */
+@Slf4j
 @RestController
 @RequestMapping("/apps")
 @RequiredArgsConstructor
@@ -159,9 +162,11 @@ public class AppController {
             @ParameterObject
             AppCodeStreamQueryDTO appCodeStreamQueryDTO,
             HttpServletRequest request) {
-
+        long t0 = System.currentTimeMillis();
+        log.info("[SSE-TIMING] Controller entry: t={}", t0);
         Flux<String> codeStream = appService.getCodeGenStream(appCodeStreamQueryDTO, request);
         return codeStream
+                .doOnSubscribe(s -> log.info("[SSE-TIMING] Flux subscribed: t={} (+{}ms)", System.currentTimeMillis(), System.currentTimeMillis() - t0))
                 .map(chunk -> {
                     Map<String, String> wrapper = Map.of("d", chunk);
                     String jsonWrapper = JSONUtil.toJsonStr(wrapper);
@@ -171,10 +176,19 @@ public class AppController {
                 })
                 .concatWith(Mono.just(
                         ServerSentEvent.<String>builder()
-                            .event("done")
-                            .data("")
-                            .build()
-                ));
+                                .event("done")
+                                .data("")
+                                .build()
+                ))
+                .onErrorResume(error -> {
+                    log.error("代码生成流异常", error);
+                    return Mono.just(
+                            ServerSentEvent.<String>builder()
+                                    .event("error")
+                                    .data(JSONUtil.toJsonStr(Map.of("code", ErrorCode.CODE_GENERATE_ERROR.getCode(), "message", error.getMessage())))
+                                    .build()
+                    );
+                });
     }
 
     /**
