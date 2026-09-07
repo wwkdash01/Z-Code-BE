@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.Parameter;
 import org.springdoc.core.annotations.ParameterObject;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -85,6 +87,7 @@ public class AppController {
      */
     @GetMapping("/user/{id}")
     public AppVO getAppById(
+            @Parameter(description = "应用ID", schema = @Schema(type = "String"))
             @PathVariable
             @NotNull
             @Min(value = 1L, message = "应用id不能小于1")
@@ -107,6 +110,7 @@ public class AppController {
             @Valid
             AppUpdateRequestDTO appUpdateRequestDTO,
 
+            @Parameter(description = "应用ID", schema = @Schema(type = "String"))
             @PathVariable
             @NotNull
             @Min(value = 1L, message = "应用id不能小于1")
@@ -124,6 +128,7 @@ public class AppController {
      */
     @DeleteMapping("/user/{id}")
     public Boolean removeAppById(
+            @Parameter(description = "应用ID", schema = @Schema(type = "String"))
             @PathVariable
             @NotNull
             @Min(value = 1L, message = "应用id不能小于1")
@@ -208,6 +213,7 @@ public class AppController {
 
     @GetMapping("/user/preview/{appId}")
     public String previewApp(
+            @Parameter(description = "应用ID", schema = @Schema(type = "String"))
             @PathVariable
             @NotNull
             @Min(value = 1L, message = "应用id不能小于1")
@@ -224,6 +230,7 @@ public class AppController {
      */
     @GetMapping("/admin/{id}")
     public App getAppByAdmin(
+            @Parameter(description = "应用ID", schema = @Schema(type = "String"))
             @PathVariable
             @NotNull
             @Min(value = 1L, message = "应用id不能小于1")
@@ -244,6 +251,7 @@ public class AppController {
             @Valid
             AppAdminUpdateRequestDTO appAdminUpdateRequestDTO,
 
+            @Parameter(description = "应用ID", schema = @Schema(type = "String"))
             @PathVariable
             @NotNull
             @Min(value = 1L, message = "应用id不能小于1")
@@ -259,6 +267,7 @@ public class AppController {
      */
     @DeleteMapping("/admin/{id}")
     public Boolean removeAppByAdmin(
+            @Parameter(description = "应用ID", schema = @Schema(type = "String"))
             @PathVariable
             @NotNull
             @Min(value = 1L, message = "应用id不能小于1")

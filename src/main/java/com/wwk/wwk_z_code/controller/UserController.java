@@ -10,6 +10,8 @@ import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.Parameter;
 import com.wwk.wwk_z_code.model.entity.User;
 import com.wwk.wwk_z_code.service.UserService;
 
@@ -48,6 +50,7 @@ public class UserController {
      */
     @DeleteMapping("/admin/{id}")
     public Boolean removeUserById(
+            @Parameter(description = "用户ID", schema = @Schema(type = "String"))
             @PathVariable
             @NotNull
             @Min(value = 1L, message = "用户id不能为负")
@@ -67,6 +70,7 @@ public class UserController {
             @Valid
             UserUpdateRequestDTO userUpdateRequestDTO,
 
+            @Parameter(description = "用户ID", schema = @Schema(type = "String"))
             @PathVariable
             @NotNull
             @Min(value = 1L, message = "用户id不能为负")
@@ -82,6 +86,7 @@ public class UserController {
      */
     @GetMapping("/admin/{id}")
     public User getInfo(
+            @Parameter(description = "用户ID", schema = @Schema(type = "String"))
             @PathVariable
             @Min(value = 1L, message = "用户id不能为负")
             Long id) {
