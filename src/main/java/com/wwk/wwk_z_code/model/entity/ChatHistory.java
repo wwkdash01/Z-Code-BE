@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.io.Serial;
 
 import com.mybatisflex.core.keygen.KeyGenerators;
+import com.wwk.wwk_z_code.model.enums.MessageType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -62,7 +63,8 @@ public class ChatHistory implements Serializable {
      * 消息类型(user/ai)
      */
     @Column("messageType")
-    private String messageType;
+    @Schema(type = "string", description = "消息类型：user=用户消息，ai=AI回复")
+    private MessageType messageType;
 
     /**
      * 编辑时间
