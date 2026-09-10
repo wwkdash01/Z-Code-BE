@@ -6,6 +6,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 
 import com.wwk.wwk_z_code.annotation.AuthCheck;
+import com.wwk.wwk_z_code.common.CursorHelper;
 import com.wwk.wwk_z_code.common.PageRequest;
 import com.wwk.wwk_z_code.exception.BusinessException;
 import com.wwk.wwk_z_code.exception.ErrorCode;
@@ -13,10 +14,13 @@ import com.wwk.wwk_z_code.mapper.AppMapper;
 import com.wwk.wwk_z_code.mapper.ChatHistoryMapper;
 import com.wwk.wwk_z_code.model.dto.ChatHistoryAddRequestDTO;
 import com.wwk.wwk_z_code.model.dto.ChatHistoryAdminQueryRequestDTO;
+import com.wwk.wwk_z_code.model.dto.ChatHistoryUserCursorQueryRequestDTO;
 import com.wwk.wwk_z_code.model.entity.App;
 import com.wwk.wwk_z_code.model.entity.ChatHistory;
 import com.wwk.wwk_z_code.model.enums.MessageType;
 import com.wwk.wwk_z_code.model.enums.UserRoleEnum;
+import com.wwk.wwk_z_code.model.vo.ChatHistoryUserCursorPageVO;
+import com.wwk.wwk_z_code.model.vo.ChatHistoryVO;
 import com.wwk.wwk_z_code.model.vo.UserVO;
 import com.wwk.wwk_z_code.service.ChatHistoryService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +31,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.wwk.wwk_z_code.constant.UserConstant.USER_LOGIN_STATUS;
 
@@ -81,24 +86,80 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
 
     @Override
     @AuthCheck(roleRequirement = UserRoleEnum.USER)
-    public ChatHistory getChatHistoryById(Long id, HttpServletRequest request) {
-        // 1-获取当前登录用户
+    public ChatHistoryVO getChatHistoryById(Long id, HttpServletRequest request) {
         UserVO currentUser = getUserVOFromSession(request);
 
-        // 2-查询记录
         ChatHistory chatHistory = this.getById(id);
         checkChatHistoryExists(chatHistory);
 
-        // 3-校验归属：通过 appId 查 App，比对 createUserId
         App dbApp = appMapper.selectOneById(chatHistory.getAppId());
-        if (dbApp == null) {
-            throw new BusinessException(ErrorCode.FORBIDDEN_ERROR, "无权访问该聊天记录");
-        }
-        if (!currentUser.getId().equals(dbApp.getCreateUserId())) {
+        if (dbApp == null || !currentUser.getId().equals(dbApp.getCreateUserId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN_ERROR, "无权访问该聊天记录");
         }
 
-        return chatHistory;
+        // 同名字段用 BeanUtils.copyProperties
+        ChatHistoryVO vo = new ChatHistoryVO();
+        BeanUtils.copyProperties(chatHistory, vo);
+        return vo;
+    }
+
+    @Override
+    @AuthCheck(roleRequirement = UserRoleEnum.USER)
+    public ChatHistoryUserCursorPageVO queryChatHistoryByCursor(ChatHistoryUserCursorQueryRequestDTO dto, HttpServletRequest request) {
+        UserVO currentUser = getUserVOFromSession(request);
+
+        // 1-解析游标
+        CursorHelper.CursorEntry cursor = dto.getCursor() != null ? CursorHelper.decode(dto.getCursor()) : null;
+
+        // 2-构建 QueryWrapper，按 (createTime ASC, id ASC) 排序
+        QueryWrapper qw = QueryWrapper.create();
+        qw.eq("appId", dto.getAppId(), dto.getAppId() != null)
+          .eq("userId", currentUser.getId(), true)
+          .eq("messageType", resolveMessageTypeValue(dto.getMessageType()), StrUtil.isNotBlank(dto.getMessageType()));
+
+        if (cursor != null) {
+            // 复合游标条件：先比时间，时间相同再比id
+            // (createTime > :time) OR (createTime = :time AND id > :id)
+            qw.and("(createTime > ? OR (createTime = ? AND id >  ?))",
+                    cursor.getCreateTime(),
+                    cursor.getCreateTime(),
+                    cursor.getId());
+        }
+        qw.orderBy("createTime", true)
+          .orderBy("id", true);
+
+        // 3-多查 1 条用于判断 hasMore
+        int limit = Math.min(dto.getPageSize(), 30);
+        Page<ChatHistory> page = new Page<>(dto.getPageNum(), limit + 1);
+        Page<ChatHistory> result = this.page(page, qw);
+
+        // 4-构造返回（先取 cutoff，再 subList，避免索引越界）
+        java.util.List<ChatHistory> allRecords = result.getRecords();
+        int totalFetched = allRecords.size();
+        boolean hasMore = totalFetched > limit;
+
+        String nextCursor = hasMore
+                ? CursorHelper.encode(new CursorHelper.CursorEntry(
+                        allRecords.get(limit).getCreateTime(),
+                        allRecords.get(limit).getId()))
+                : null;
+
+        java.util.List<ChatHistory> currentPageRecords = hasMore ? allRecords.subList(0, limit) : allRecords;
+
+        // 转为 VO 返回（同名字段用 BeanUtils.copyProperties）
+        java.util.List<ChatHistoryVO> recordsVO = currentPageRecords.stream()
+                .map(e -> {
+                    ChatHistoryVO vo = new ChatHistoryVO();
+                    BeanUtils.copyProperties(e, vo);
+                    return vo;
+                })
+                .collect(Collectors.toList());
+
+        ChatHistoryUserCursorPageVO vo = new ChatHistoryUserCursorPageVO();
+        vo.setRecords(recordsVO);
+        vo.setHasMore(hasMore);
+        vo.setNextCursor(nextCursor);
+        return vo;
     }
 
     // endregion

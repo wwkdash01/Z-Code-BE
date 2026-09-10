@@ -3,7 +3,10 @@ package com.wwk.wwk_z_code.service;
 import com.mybatisflex.core.paginate.Page;
 import com.wwk.wwk_z_code.model.dto.ChatHistoryAddRequestDTO;
 import com.wwk.wwk_z_code.model.dto.ChatHistoryAdminQueryRequestDTO;
+import com.wwk.wwk_z_code.model.dto.ChatHistoryUserCursorQueryRequestDTO;
 import com.wwk.wwk_z_code.model.entity.ChatHistory;
+import com.wwk.wwk_z_code.model.vo.ChatHistoryUserCursorPageVO;
+import com.wwk.wwk_z_code.model.vo.ChatHistoryVO;
 import com.mybatisflex.core.service.IService;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -30,7 +33,7 @@ public interface ChatHistoryService extends IService<ChatHistory> {
      * @param request HTTP请求
      * @return 聊天记录实体
      */
-    ChatHistory getChatHistoryById(Long id, HttpServletRequest request);
+    ChatHistoryVO getChatHistoryById(Long id, HttpServletRequest request);
 
     /**
      * 根据主键删除记录（ADMIN）
@@ -45,4 +48,13 @@ public interface ChatHistoryService extends IService<ChatHistory> {
      * @return 聊天记录分页对象
      */
     Page<ChatHistory> getChatHistoryByAdminPage(ChatHistoryAdminQueryRequestDTO chatHistoryAdminQueryRequestDTO);
+
+    /**
+     * 游标分页查询聊天记录（USER，需登录并校验应用归属）
+     * 用于 IM 无限屏场景：按 createTime DESC, id DESC 排序翻页。
+     * @param dto 游标查询请求DTO
+     * @param request HTTP请求
+     * @return 游标分页结果VO
+     */
+    ChatHistoryUserCursorPageVO queryChatHistoryByCursor(ChatHistoryUserCursorQueryRequestDTO dto, HttpServletRequest request);
 }

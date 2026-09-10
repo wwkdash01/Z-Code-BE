@@ -3,7 +3,10 @@ package com.wwk.wwk_z_code.controller;
 import com.mybatisflex.core.paginate.Page;
 import com.wwk.wwk_z_code.model.dto.ChatHistoryAddRequestDTO;
 import com.wwk.wwk_z_code.model.dto.ChatHistoryAdminQueryRequestDTO;
+import com.wwk.wwk_z_code.model.dto.ChatHistoryUserCursorQueryRequestDTO;
 import com.wwk.wwk_z_code.model.entity.ChatHistory;
+import com.wwk.wwk_z_code.model.vo.ChatHistoryUserCursorPageVO;
+import com.wwk.wwk_z_code.model.vo.ChatHistoryVO;
 import com.wwk.wwk_z_code.service.ChatHistoryService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -61,7 +64,7 @@ public class ChatHistoryController {
      * @return 聊天记录实体
      */
     @GetMapping("/user/{id}")
-    public ChatHistory getChatHistoryById(
+    public ChatHistoryVO getChatHistoryById(
             @Parameter(description = "聊天记录ID", schema = @Schema(type = "String"))
             @PathVariable
             @NotNull
@@ -100,5 +103,22 @@ public class ChatHistoryController {
             @ParameterObject
             ChatHistoryAdminQueryRequestDTO chatHistoryAdminQueryRequestDTO) {
         return chatHistoryService.getChatHistoryByAdminPage(chatHistoryAdminQueryRequestDTO);
+    }
+
+    /**
+     * 游标分页查询聊天记录(USER，IM无限屏场景)
+     *
+     * @param dto 游标查询请求DTO（query 参数自动绑定）
+     * @param request HTTP请求
+     * @return 游标分页结果
+     */
+    @GetMapping("/user/cursor")
+    public ChatHistoryUserCursorPageVO queryChatHistoryByCursor(
+            @ModelAttribute
+            @Valid
+            @ParameterObject
+            ChatHistoryUserCursorQueryRequestDTO dto,
+            HttpServletRequest request) {
+        return chatHistoryService.queryChatHistoryByCursor(dto, request);
     }
 }
