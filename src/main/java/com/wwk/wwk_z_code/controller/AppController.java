@@ -121,6 +121,7 @@ public class AppController {
 
     /**
      * 根据主键删除应用(USER)
+     * 副作用：级联逻辑删除该应用下所有聊天记录
      *
      * @param id 主键
      * @param request Http请求
@@ -261,6 +262,7 @@ public class AppController {
 
     /**
      * 根据主键删除应用(ADMIN)
+     * 副作用：级联逻辑删除该应用下所有聊天记录
      *
      * @param id 主键
      * @return {@code true} 删除成功，{@code false} 删除失败

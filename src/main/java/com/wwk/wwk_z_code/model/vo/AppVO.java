@@ -10,7 +10,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 应用视图对象，返回给用户的脱敏应用信息，不包含优先级、部署密钥与审计字段。
+ * 应用视图对象，返回给用户的脱敏应用信息，不包含优先级与审计字段。
  *
  * @author wwk
  */
@@ -53,6 +53,11 @@ public class AppVO implements Serializable {
      * 应用标签
      */
     private TagEnum appTag;
+
+    /**
+     * 应用部署密钥（用于拼接 /api/deployments/{deployKey}/ 访问已部署应用）
+     */
+    private String deployKey;
 
     /**
      * 创建时间

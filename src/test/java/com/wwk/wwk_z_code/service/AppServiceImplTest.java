@@ -42,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -60,6 +61,9 @@ class AppServiceImplTest {
     private UserMapper userMapper;
 
     @Mock
+    private ChatHistoryService chatHistoryService;
+
+    @Mock
     private HttpServletRequest request;
 
     @Mock
@@ -69,7 +73,8 @@ class AppServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = Mockito.spy(new AppServiceImpl(aiCodeGeneratorFacade, userMapper));
+        service = Mockito.spy(new AppServiceImpl(aiCodeGeneratorFacade, userMapper, chatHistoryService));
+        lenient().when(chatHistoryService.save(any())).thenReturn(true);
     }
 
     // region 私有工具方法测试

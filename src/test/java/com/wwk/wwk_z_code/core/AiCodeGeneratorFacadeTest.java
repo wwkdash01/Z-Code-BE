@@ -1,5 +1,6 @@
 package com.wwk.wwk_z_code.core;
 
+import com.wwk.wwk_z_code.model.dto.StreamCallbackResult;
 import com.wwk.wwk_z_code.model.enums.CodeGenEnum;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -36,10 +37,10 @@ class AiCodeGeneratorFacadeTest {
     @Test
     void generateAndSaveCodeByStreamWithCallback() {
         Long appId = 2L;
-        AtomicReference<String> savedDirRef = new AtomicReference<>();
+        AtomicReference<StreamCallbackResult> savedDirRef = new AtomicReference<>();
 
-        Consumer<String> callback = (dir) -> {
-            savedDirRef.set(dir);
+        Consumer<StreamCallbackResult> callback = (result) -> {
+            savedDirRef.set(result);
         };
 
         Flux<String> result = aiCodeGeneratorFacade.generateAndSaveCodeByStream(
@@ -50,9 +51,10 @@ class AiCodeGeneratorFacadeTest {
         Assertions.assertNotNull(collectedEvents);
         assertFalse(collectedEvents.isEmpty());
 
-        // 验证回调拿到了保存目录
+        // 验证回调拿到了保存目录和AI回复
         Assertions.assertNotNull(savedDirRef.get());
-        assertTrue(savedDirRef.get().endsWith("_" + appId));
-        assertTrue(new File(savedDirRef.get()).exists());
+        assertTrue(savedDirRef.get().getSaveDirPath().endsWith("_" + appId));
+        assertTrue(new File(savedDirRef.get().getSaveDirPath()).exists());
+        Assertions.assertTrue(savedDirRef.get().getAiResponse().length() > 0);
     }
 }

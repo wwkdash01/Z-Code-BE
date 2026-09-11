@@ -43,6 +43,14 @@ public interface ChatHistoryService extends IService<ChatHistory> {
     Boolean removeChatHistoryByAdmin(Long id);
 
     /**
+     * 按应用ID级联逻辑删除该应用下所有聊天记录
+     * 仅供 AppService 删除应用时调用，框架自动转 UPDATE isDelete=1。
+     * @param appId 应用ID
+     * @return {@code true} 操作执行成功（无匹配记录也返回 true）
+     */
+    Boolean removeByAppId(Long appId);
+
+    /**
      * 分页查询聊天记录（ADMIN，全条件检索）
      * @param chatHistoryAdminQueryRequestDTO 管理分页查询DTO
      * @return 聊天记录分页对象

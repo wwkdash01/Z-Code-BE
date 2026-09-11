@@ -87,7 +87,7 @@ public class ChatHistory implements Serializable {
     /**
      * 是否删除
      */
-    @Column("isDelete")
+    @Column(value = "isDelete", isLogicDelete = true)
     private Integer isDelete;
 
 }

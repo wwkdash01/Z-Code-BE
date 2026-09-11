@@ -42,6 +42,7 @@ public interface AppService extends IService<App> {
 
     /**
      * 根据主键删除应用（USER，校验归属）
+     * 副作用：级联逻辑删除该应用下所有聊天记录（chat_history.isDelete=1）
      * @param id 主键
      * @param request HTTP请求
      * @return {@code true} 删除成功，{@code false} 删除失败
@@ -104,6 +105,7 @@ public interface AppService extends IService<App> {
 
     /**
      * 根据主键删除应用（ADMIN）
+     * 副作用：级联逻辑删除该应用下所有聊天记录（chat_history.isDelete=1）
      * @param id 主键
      * @return {@code true} 删除成功，{@code false} 删除失败
      */

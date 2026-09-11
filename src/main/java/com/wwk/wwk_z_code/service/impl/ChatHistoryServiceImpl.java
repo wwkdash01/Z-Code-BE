@@ -111,7 +111,7 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         // 1-解析游标
         CursorHelper.CursorEntry cursor = dto.getCursor() != null ? CursorHelper.decode(dto.getCursor()) : null;
 
-        // 2-构建 QueryWrapper，按 (createTime ASC, id ASC) 排序
+        // 2-构建 QueryWrapper，按 (createTime DESC, id DESC) 排序
         QueryWrapper qw = QueryWrapper.create();
         qw.eq("appId", dto.getAppId(), dto.getAppId() != null)
           .eq("userId", currentUser.getId(), true)
@@ -120,13 +120,13 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         if (cursor != null) {
             // 复合游标条件：先比时间，时间相同再比id
             // (createTime > :time) OR (createTime = :time AND id > :id)
-            qw.and("(createTime > ? OR (createTime = ? AND id >  ?))",
+            qw.and("(createTime < ? OR (createTime = ? AND id < ?))",
                     cursor.getCreateTime(),
                     cursor.getCreateTime(),
                     cursor.getId());
         }
-        qw.orderBy("createTime", true)
-          .orderBy("id", true);
+        qw.orderBy("createTime", false)
+          .orderBy("id", false);
 
         // 3-多查 1 条用于判断 hasMore
         int limit = Math.min(dto.getPageSize(), 30);
@@ -175,6 +175,17 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
 
         // 2-删除
         return this.removeById(id);
+    }
+
+    @Override
+    public Boolean removeByAppId(Long appId) {
+        if (appId == null) {
+            return false;
+        }
+        QueryWrapper qw = QueryWrapper.create().eq("appId", appId);
+        // 框架自动转 UPDATE chat_history SET isDelete=1 WHERE appId=? AND isDelete=0
+        this.remove(qw);
+        return true;
     }
 
     @Override

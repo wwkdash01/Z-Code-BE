@@ -12,14 +12,18 @@ import com.wwk.wwk_z_code.common.PageRequest;
 import com.wwk.wwk_z_code.common.ThrowUtils;
 import com.wwk.wwk_z_code.constant.AppConstant;
 import com.wwk.wwk_z_code.core.AiCodeGeneratorFacade;
+import com.wwk.wwk_z_code.model.dto.StreamCallbackResult;
 import com.wwk.wwk_z_code.exception.BusinessException;
 import com.wwk.wwk_z_code.exception.ErrorCode;
 import com.wwk.wwk_z_code.mapper.AppMapper;
+import com.wwk.wwk_z_code.service.ChatHistoryService;
 import com.wwk.wwk_z_code.mapper.UserMapper;
 import com.wwk.wwk_z_code.model.dto.*;
 import com.wwk.wwk_z_code.model.entity.App;
+import com.wwk.wwk_z_code.model.entity.ChatHistory;
 import com.wwk.wwk_z_code.model.entity.User;
 import com.wwk.wwk_z_code.model.enums.CodeGenEnum;
+import com.wwk.wwk_z_code.model.enums.MessageType;
 import com.wwk.wwk_z_code.model.enums.UserRoleEnum;
 import com.wwk.wwk_z_code.model.vo.AppVO;
 import com.wwk.wwk_z_code.model.vo.UserVO;
@@ -30,11 +34,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -55,6 +61,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     private final AiCodeGeneratorFacade aiCodeGeneratorFacade;
     private final UserMapper userMapper;
+    private final ChatHistoryService chatHistoryService;
 
     // region 用户接口
 
@@ -100,7 +107,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 1-校验归属
         App dbApp = checkAppOwnership(id, request);
 
-        // 2-复制PO属性到VO（脱敏，剔除 priority/deployKey/审计字段）
+        // 2-复制PO属性到VO（脱敏，剔除 priority/审计字段）
         return toAppVO(dbApp);
     }
 
@@ -133,11 +140,15 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
      */
     @Override
     @AuthCheck(roleRequirement = UserRoleEnum.USER)
+    @Transactional(rollbackFor = Exception.class)
     public Boolean removeAppById(Long id, HttpServletRequest request) {
         // 1-校验归属
         checkAppOwnership(id, request);
 
-        // 2-删除
+        // 2-级联逻辑删除该应用的所有聊天记录
+        chatHistoryService.removeByAppId(id);
+
+        // 3-删除应用（框架透明转 UPDATE isDelete=1）
         this.removeById(id);
         return true;
     }
@@ -249,11 +260,15 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
      */
     @Override
     @AuthCheck(roleRequirement = UserRoleEnum.ADMIN)
+    @Transactional(rollbackFor = Exception.class)
     public Boolean removeAppByAdmin(Long id) {
         // 1-校验id是否存在
         checkAppExists(this.getById(id));
 
-        // 2-删除
+        // 2-级联逻辑删除该应用的所有聊天记录
+        chatHistoryService.removeByAppId(id);
+
+        // 3-删除应用（框架透明转 UPDATE isDelete=1）
         this.removeById(id);
         return true;
     }
@@ -307,7 +322,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @AuthCheck(roleRequirement = UserRoleEnum.GUEST)
     public Flux<String> getCodeGenStream(AppCodeStreamQueryDTO appCodeStreamQueryDTO, HttpServletRequest request) {
         long t0 = System.currentTimeMillis();
-        // 1-校验应用存在 + 归属当前用户（内部含 getById + checkAppExists）
+
+        // 1-获取当前登录用户 + 校验应用归属
+        UserVO currentUser = getUserVOFromSession(request);
         App dbApp = checkAppOwnership(appCodeStreamQueryDTO.getAppId(), request);
         log.info("[SSE-TIMING] Service - checkAppOwnership done: t={} (+{}ms)", System.currentTimeMillis(), System.currentTimeMillis() - t0);
 
@@ -315,10 +332,36 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         CodeGenEnum codeGenEnum = dbApp.getCodeGenType();
         log.info("[SSE-TIMING] Service - before facade call: t={} (+{}ms)", System.currentTimeMillis(), System.currentTimeMillis() - t0);
 
-        // 3-调用门面生成返回并回调更新代码生成路径
-        Consumer<String> callback = (saveDir) -> {
-            dbApp.setCodeGenDir(saveDir);
+        // 3-保存用户提示词到chatHistory表
+        LocalDateTime now = LocalDateTime.now();
+        ChatHistory promptRecord = ChatHistory.builder()
+                .appId(dbApp.getId())
+                .userId(currentUser.getId())
+                .message(appCodeStreamQueryDTO.getUserPrompt())
+                .messageType(MessageType.USER)
+                .createTime(now)
+                .updateTime(now)
+                .editTime(now)
+                .isDelete(0)
+                .build();
+        chatHistoryService.save(promptRecord);
+
+        // 4-调用门面生成返回并回调保存代码路径 + AI回复
+        Consumer<StreamCallbackResult> callback = (result) -> {
+            dbApp.setCodeGenDir(result.getSaveDirPath());
             this.updateById(dbApp);
+
+            ChatHistory aiRecord = ChatHistory.builder()
+                    .appId(dbApp.getId())
+                    .userId(currentUser.getId())
+                    .message(result.getAiResponse())
+                    .messageType(MessageType.AI)
+                    .createTime(LocalDateTime.now())
+                    .updateTime(LocalDateTime.now())
+                    .editTime(LocalDateTime.now())
+                    .isDelete(0)
+                    .build();
+            chatHistoryService.save(aiRecord);
         };
 
         Flux<String> result = aiCodeGeneratorFacade.generateAndSaveCodeByStream(
@@ -489,7 +532,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     }
 
     /**
-     * PO转脱敏VO（剔除 priority/deployKey/审计字段，补充创建人信息）
+     * PO转脱敏VO（剔除 priority/审计字段，补充创建人信息）
      * @param app 应用实体
      * @return 应用视图对象
      */
