@@ -189,6 +189,7 @@ class AppServiceImplTest {
         assertEquals("我的博客", vo.getAppName());
         assertEquals(CodeGenEnum.MULTIFILE_HTML, vo.getCodeGenType());
         assertEquals(TagEnum.WEB_PAGE, vo.getAppTag());
+        assertEquals(99, vo.getPriority());
         assertNotNull(vo.getCreateTime());
         assertEquals("tester", vo.getUserName());
         assertEquals("http://avatar", vo.getUserAvatar());

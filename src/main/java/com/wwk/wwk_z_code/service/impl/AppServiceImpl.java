@@ -106,8 +106,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     public AppVO getAppById(Long id, HttpServletRequest request) {
         // 1-校验归属
         App dbApp = checkAppOwnership(id, request);
-
-        // 2-复制PO属性到VO（脱敏，剔除 priority/审计字段）
+        // 2-复制PO属性到VO（脱敏，剔除审计字段）
         return toAppVO(dbApp);
     }
 
@@ -532,7 +531,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     }
 
     /**
-     * PO转脱敏VO（剔除 priority/审计字段，补充创建人信息）
+     * PO转脱敏VO（剔除审计字段，补充创建人信息）
      * @param app 应用实体
      * @return 应用视图对象
      */
