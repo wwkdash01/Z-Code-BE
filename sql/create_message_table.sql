@@ -9,7 +9,7 @@ create table if not exists chat_history
     appId           bigint                                 not null comment '应用id',
     userId          bigint                                 not null comment '用户id',
     message         text                                   not null comment '消息',
-    messageType     varchar(16)                            not null comment '消息类型(user/ai)',
+    messageType     varchar(16)                            not null comment '消息类型(user/ai/error/retraction)',
 
     editTime        datetime     default CURRENT_TIMESTAMP not null comment '编辑时间',
     createTime      datetime     default CURRENT_TIMESTAMP not null comment '创建时间',

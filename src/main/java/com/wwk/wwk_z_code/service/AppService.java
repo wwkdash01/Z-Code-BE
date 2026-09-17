@@ -89,6 +89,13 @@ public interface AppService extends IService<App> {
     Page<AppVO> getFeaturedAppByPage(AppQueryRequestDTO appQueryRequestDTO);
 
     /**
+     * 根据主键获取精选应用详情（GUEST，游客公开，脱敏VO，校验是否为精选）
+     * @param id 主键
+     * @return 应用视图对象
+     */
+    AppVO getFeaturedAppById(Long id);
+
+    /**
      * 根据主键获取应用信息（ADMIN，不脱敏返回PO）
      * @param id 主键
      * @return 应用实体

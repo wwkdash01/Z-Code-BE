@@ -198,7 +198,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 2-封装QueryWrapper（精选 priority=99）
         QueryWrapper queryWrapper = new QueryWrapper();
         queryWrapper
-                .eq("priority", 99)
+                .eq("priority", AppConstant.FEATURED_PRIORITY)
                 .like("appName", appQueryRequestDTO.getAppName(), StrUtil.isNotBlank(appQueryRequestDTO.getAppName()))
                 .eq("appTag", appQueryRequestDTO.getAppTag(), StrUtil.isNotBlank(appQueryRequestDTO.getAppTag()));
 
@@ -210,6 +210,27 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 4-查询并转脱敏VO
         Page<App> result = new Page<>(appQueryRequestDTO.getPageNum(), appQueryRequestDTO.getPageSize());
         return toAppVOPage(this.page(result, queryWrapper));
+    }
+
+    /**
+     * 根据主键获取精选应用详情（GUEST，校验是否为精选应用）
+     * @param id 主键
+     * @return 应用视图对象
+     */
+    @Override
+    @AuthCheck(roleRequirement = UserRoleEnum.GUEST)
+    public AppVO getFeaturedAppById(Long id) {
+        // 1-校验应用存在
+        App dbApp = this.getById(id);
+        checkAppExists(dbApp);
+
+        // 2-校验是否为精选应用
+        if (dbApp.getPriority() == null || dbApp.getPriority() != AppConstant.FEATURED_PRIORITY) {
+            throw new BusinessException(ErrorCode.FORBIDDEN_ERROR, "应用不存在或非精选应用");
+        }
+
+        // 3-复制PO属性到VO（脱敏，剔除审计字段）
+        return toAppVO(dbApp);
     }
 
     // endregion
@@ -331,19 +352,21 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         CodeGenEnum codeGenEnum = dbApp.getCodeGenType();
         log.info("[SSE-TIMING] Service - before facade call: t={} (+{}ms)", System.currentTimeMillis(), System.currentTimeMillis() - t0);
 
-        // 3-保存用户提示词到chatHistory表
-        LocalDateTime now = LocalDateTime.now();
-        ChatHistory promptRecord = ChatHistory.builder()
-                .appId(dbApp.getId())
-                .userId(currentUser.getId())
-                .message(appCodeStreamQueryDTO.getUserPrompt())
-                .messageType(MessageType.USER)
-                .createTime(now)
-                .updateTime(now)
-                .editTime(now)
-                .isDelete(0)
-                .build();
-        chatHistoryService.save(promptRecord);
+        // 3-保存用户提示词到chatHistory表（重试请求的提示词此前已落库，不重复写入）
+        if (!Boolean.TRUE.equals(appCodeStreamQueryDTO.getRetry())) {
+            LocalDateTime now = LocalDateTime.now();
+            ChatHistory promptRecord = ChatHistory.builder()
+                    .appId(dbApp.getId())
+                    .userId(currentUser.getId())
+                    .message(appCodeStreamQueryDTO.getUserPrompt())
+                    .messageType(MessageType.USER)
+                    .createTime(now)
+                    .updateTime(now)
+                    .editTime(now)
+                    .isDelete(0)
+                    .build();
+            chatHistoryService.save(promptRecord);
+        }
 
         // 4-调用门面生成返回并回调保存代码路径 + AI回复
         Consumer<StreamCallbackResult> callback = (result) -> {
@@ -370,7 +393,39 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                 callback
         );
         log.info("[SSE-TIMING] Service - facade returned Flux: t={}", System.currentTimeMillis());
-        return result;
+
+        // 5-流中途失败时补一条错误记录：成功回调不触发，否则该次对话只留用户提示词
+        return result.doOnError(error -> saveErrorChatHistory(dbApp.getId(), currentUser.getId(), error));
+    }
+
+    /**
+     * 保存代码生成失败的聊天记录
+     * <p>落库异常自行吞掉：写库失败不能覆盖原始错误，否则前端拿不到失败原因。</p>
+     *
+     * @param appId  应用id
+     * @param userId 用户id
+     * @param error  流异常
+     */
+    private void saveErrorChatHistory(Long appId, Long userId, Throwable error) {
+        try {
+            String detail = StrUtil.blankToDefault(error.getMessage(), "");
+            String message = StrUtil.maxLength(
+                    StrUtil.isBlank(detail) ? ErrorCode.CODE_GENERATE_ERROR.getMessage() : "代码生成失败：" + detail,
+                    500);
+            LocalDateTime now = LocalDateTime.now();
+            chatHistoryService.save(ChatHistory.builder()
+                    .appId(appId)
+                    .userId(userId)
+                    .message(message)
+                    .messageType(MessageType.ERROR)
+                    .createTime(now)
+                    .updateTime(now)
+                    .editTime(now)
+                    .isDelete(0)
+                    .build());
+        } catch (Exception e) {
+            log.warn("[SSE] 失败记录落库异常，忽略: {}", e.getMessage());
+        }
     }
 
     @Override
@@ -393,8 +448,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             throw new BusinessException(ErrorCode.PARAM_ERROR, "应用未配置代码生成目录");
         }
 
-        // 4-校验生成目录是否存在，不存在抛异常
-        File sourceDir = new File(AppConstant.FILE_SAVE_ROOT_DIR + File.separator + codeGenDir);
+        // 4-校验生成目录是否存在，不存在抛异常（codeGenDir 落库为绝对路径，不可再拼生成根目录）
+        File sourceDir = new File(codeGenDir);
         if (!sourceDir.exists()) {
             throw new BusinessException(ErrorCode.CODE_GENERATE_NOT_FOUND, "代码尚未生成，无法部署");
         }
@@ -431,13 +486,14 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
 
         // 3-校验目录内容，不存在抛异常
-        File previewDir = new File(AppConstant.FILE_SAVE_ROOT_DIR + File.separator + codeGenDir);
+        File previewDir = new File(codeGenDir);
         if (!previewDir.exists()) {
             throw new BusinessException(ErrorCode.CODE_GENERATE_NOT_FOUND, "代码尚未生成，无法预览");
         }
 
-        // 3-返回访问URL
-        return String.format("%s/%s", AppConstant.LOCAL_RREVIEW_BASE_URL, codeGenDir);
+        // 3-返回访问URL（nginx 以 /preview/ 前缀映射生成根目录，URL 中只能带目录名）
+        return String.format("%s/%s", AppConstant.LOCAL_RREVIEW_BASE_URL,
+                new File(codeGenDir).getName());
     }
 
     /**

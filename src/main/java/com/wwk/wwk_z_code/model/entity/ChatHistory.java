@@ -60,14 +60,16 @@ public class ChatHistory implements Serializable {
     private String message;
 
     /**
-     * 消息类型(user/ai)
+     * 消息类型(user/ai/error/retraction)
+     * <p>retraction 不是新增的行：撤销时把原 user 行的 messageType 就地改写，id 与 message 原文保留，
+     * 前端据此定位并丢弃被撤销的那一轮对话。</p>
      */
     @Column("messageType")
-    @Schema(type = "string", description = "消息类型：user=用户消息，ai=AI回复")
+    @Schema(type = "string", description = "消息类型：user=用户消息，ai=AI回复，error=错误消息，retraction=撤销的消息")
     private MessageType messageType;
 
     /**
-     * 编辑时间
+     * 编辑时间（撤销改写 messageType 时刷新）
      */
     @Column("editTime")
     private LocalDateTime editTime;

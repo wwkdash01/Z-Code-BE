@@ -1,5 +1,6 @@
 package com.wwk.wwk_z_code.controller;
 
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.wwk.wwk_z_code.model.dto.*;
@@ -25,8 +26,11 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import org.springdoc.core.annotations.ParameterObject;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -60,6 +64,22 @@ public class AppController {
             @ParameterObject
             AppQueryRequestDTO appQueryRequestDTO) {
         return appService.getFeaturedAppByPage(appQueryRequestDTO);
+    }
+
+    /**
+     * 根据主键获取精选应用详情(GUEST，游客公开，脱敏VO)
+     *
+     * @param id 主键
+     * @return 应用视图对象
+     */
+    @GetMapping("/guest/{id}")
+    public AppVO getFeaturedAppById(
+            @Parameter(description = "应用ID", schema = @Schema(type = "String"))
+            @PathVariable
+            @NotNull
+            @Min(value = 1L, message = "应用id不能小于1")
+            Long id) {
+        return appService.getFeaturedAppById(id);
     }
 
     /**
@@ -157,11 +177,29 @@ public class AppController {
 
     /**
      * 获取代码生成输出流(USER)
+     * <p>建立流之前的失败（未登录/非本人应用/参数不合规）仍由全局异常处理器返回 JSON，
+     * 流建立之后的失败才用 SSE 的 error 事件表达。</p>
+     * <p>帧协议：数据帧 {@code event:message}（data 为 {"d":"分片"}）、结束帧 {@code event:done}、
+     * 错误帧 {@code event:error}（data 为 {"code":50001,"message":".."}），三帧均显式带事件名，
+     * 前端按事件名分流即可（不要再依赖 SSE 默认事件名）。</p>
+     * <p>该接口保留在 OpenAPI 文档中（帧协议见下方 @Operation 的 description），但前端不参与
+     * openapi2ts 生成：流式响应无法用 schema 表达，由生成前的 afterOpenApiDataInited hook 排除该 path。</p>
      *
      * @param appCodeStreamQueryDTO 代码输出流请求DTO
      * @param request Http请求
      * @return Flux输出流
      */
+    @Operation(summary = "获取代码生成输出流", description = """
+            SSE 流式输出，帧协议如下（三帧均显式带事件名，前端按事件名分流）：
+            - 数据帧：`event:message`，data 为 `{"d":"分片"}`，分片逐块追加
+            - 结束帧：`event:done`，data 为空，只有成功才发
+            - 错误帧：`event:error`，data 为 `{"code":50001,"message":"..."}`
+            流建立之前的失败（未登录/无权限/参数不合规）不进入流，返回 JSON 包装体。
+            `retry=true` 时后端不落库本次用户提示词（前端失败重试场景），AI 回复与错误记录仍照常落库。
+            前端需手写 SSE 客户端，不要使用 openapi2ts 为该接口生成的调用。""")
+    @ApiResponse(responseCode = "200", description = "SSE 事件流",
+            content = @Content(mediaType = MediaType.TEXT_EVENT_STREAM_VALUE,
+                    schema = @Schema(implementation = String.class)))
     @GetMapping(value = "/user/code-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> getCodeGenStream(
             @Valid
@@ -170,6 +208,7 @@ public class AppController {
             HttpServletRequest request) {
         long t0 = System.currentTimeMillis();
         log.info("[SSE-TIMING] Controller entry: t={}", t0);
+
         Flux<String> codeStream = appService.getCodeGenStream(appCodeStreamQueryDTO, request);
         return codeStream
                 .doOnSubscribe(s -> log.info("[SSE-TIMING] Flux subscribed: t={} (+{}ms)", System.currentTimeMillis(), System.currentTimeMillis() - t0))
@@ -177,6 +216,7 @@ public class AppController {
                     Map<String, String> wrapper = Map.of("d", chunk);
                     String jsonWrapper = JSONUtil.toJsonStr(wrapper);
                     return ServerSentEvent.<String>builder()
+                            .event("message")
                             .data(jsonWrapper)
                             .build();
                 })
@@ -188,13 +228,27 @@ public class AppController {
                 ))
                 .onErrorResume(error -> {
                     log.error("代码生成流异常", error);
-                    return Mono.just(
-                            ServerSentEvent.<String>builder()
-                                    .event("error")
-                                    .data(JSONUtil.toJsonStr(Map.of("code", ErrorCode.CODE_GENERATE_ERROR.getCode(), "message", error.getMessage())))
-                                    .build()
-                    );
+                    return Mono.just(errorEvent(error));
                 });
+    }
+
+    /**
+     * 构造 SSE 错误事件
+     * <p>message 必须兜底：Map.of 拒绝 null 值，error.getMessage() 为 null 时
+     * 会在兜底逻辑内抛 NPE，反而覆盖原始错误并导致断流。</p>
+     *
+     * @param error 流异常
+     * @return error 事件，data 为 {@code {"code":50001,"message":".."}}
+     */
+    private static ServerSentEvent<String> errorEvent(Throwable error) {
+        String detail = StrUtil.blankToDefault(error.getMessage(), "");
+        String message = StrUtil.maxLength(
+                StrUtil.isBlank(detail) ? ErrorCode.CODE_GENERATE_ERROR.getMessage() : "代码生成失败：" + detail,
+                500);
+        return ServerSentEvent.<String>builder()
+                .event("error")
+                .data(JSONUtil.toJsonStr(Map.of("code", ErrorCode.CODE_GENERATE_ERROR.getCode(), "message", message)))
+                .build();
     }
 
     /**

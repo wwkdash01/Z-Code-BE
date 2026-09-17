@@ -15,6 +15,7 @@ import com.wwk.wwk_z_code.mapper.ChatHistoryMapper;
 import com.wwk.wwk_z_code.model.dto.ChatHistoryAddRequestDTO;
 import com.wwk.wwk_z_code.model.dto.ChatHistoryAdminQueryRequestDTO;
 import com.wwk.wwk_z_code.model.dto.ChatHistoryUserCursorQueryRequestDTO;
+import com.wwk.wwk_z_code.model.dto.RetractUserPromptRequestDTO;
 import com.wwk.wwk_z_code.model.entity.App;
 import com.wwk.wwk_z_code.model.entity.ChatHistory;
 import com.wwk.wwk_z_code.model.enums.MessageType;
@@ -162,6 +163,46 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         return vo;
     }
 
+    @Override
+    @AuthCheck(roleRequirement = UserRoleEnum.USER)
+    public Boolean retractUserPrompt(RetractUserPromptRequestDTO dto, HttpServletRequest request) {
+        // 1-获取当前登录用户并校验应用归属
+        UserVO currentUser = getUserVOFromSession(request);
+        checkAppOwnership(dto.getAppId(), request);
+
+        // 2-定位待撤销的消息：指定 id 时按 (id, appId, userId) 精确取，未指定时按最新一轮失败对话推断
+        ChatHistory target = dto.getChatHistoryId() != null
+                ? getOwnedChatHistory(dto.getChatHistoryId(), dto.getAppId(), currentUser.getId())
+                : getLatestFailedPrompt(dto.getAppId(), currentUser.getId());
+        if (target == null) {
+            throw new BusinessException(ErrorCode.FORBIDDEN_ERROR, "聊天记录不存在或已删除");
+        }
+
+        // 3-已是 retraction 说明该轮此前撤销过（前端重复点击/重复重试），幂等返回
+        if (MessageType.RETRACTION == target.getMessageType()) {
+            return true;
+        }
+
+        if (MessageType.USER != target.getMessageType()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "只能撤销用户提示词");
+        }
+
+        // 4-就地把原 user 行改写为 retraction：id 与 message 原文保留，前端据此丢弃整轮对话
+        LocalDateTime now = LocalDateTime.now();
+        ChatHistory retraction = new ChatHistory();
+        retraction.setMessageType(MessageType.RETRACTION);
+        retraction.setEditTime(now);
+        retraction.setUpdateTime(now);
+
+        // 5-WHERE messageType='user' 兼作并发守卫；影响 0 行说明已被并发请求撤销，同样算成功
+        this.update(retraction, QueryWrapper.create()
+                .eq("id", target.getId(), true)
+                .eq("appId", dto.getAppId(), true)
+                .eq("userId", currentUser.getId(), true)
+                .eq("messageType", MessageType.USER.getCode(), true));
+        return true;
+    }
+
     // endregion
 
     // region 管理员接口
@@ -228,6 +269,45 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         if (chatHistory == null) {
             throw new BusinessException(ErrorCode.FORBIDDEN_ERROR, "聊天记录不存在或已删除");
         }
+    }
+
+    /**
+     * 按 (id, appId, userId) 精确查询一条聊天记录（限定本人 + 限定应用，避免越权撤销）
+     */
+    private ChatHistory getOwnedChatHistory(Long id, Long appId, Long userId) {
+        return this.getOne(QueryWrapper.create()
+                .eq("id", id, true)
+                .eq("appId", appId, true)
+                .eq("userId", userId, true)
+                .limit(1));
+    }
+
+    /**
+     * 推断最新一轮失败对话的用户提示词
+     * <p>最新一条必须是 error：正常结束的对话（最后是 ai 回复）或流仍在进行（最后是 user）都没有可撤销的内容。
+     * 再按 (createTime DESC, id DESC) 取第一条 user/retraction，跳过该轮失败产生的 error 行。</p>
+     *
+     * @return 待撤销的 user 行；该轮已撤销过则返回 retraction 行；都没有则返回 null
+     */
+    private ChatHistory getLatestFailedPrompt(Long appId, Long userId) {
+        ChatHistory latest = this.getOne(QueryWrapper.create()
+                .eq("appId", appId, true)
+                .eq("userId", userId, true)
+                .orderBy("createTime", false)
+                .orderBy("id", false)
+                .limit(1));
+
+        if (latest == null || MessageType.ERROR != latest.getMessageType()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "无可撤销的消息");
+        }
+
+        return this.getOne(QueryWrapper.create()
+                .eq("appId", appId, true)
+                .eq("userId", userId, true)
+                .in("messageType", MessageType.USER.getCode(), MessageType.RETRACTION.getCode())
+                .orderBy("createTime", false)
+                .orderBy("id", false)
+                .limit(1));
     }
 
     /**

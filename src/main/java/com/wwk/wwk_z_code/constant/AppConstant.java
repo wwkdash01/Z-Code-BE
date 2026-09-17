@@ -21,4 +21,9 @@ public interface AppConstant {
      * 部署根目录
      */
     String CODE_DEPLOY_DIR = System.getProperty("user.dir") + "/tmp/code_deploy";
+
+    /**
+     * 精选应用展示优先级（priority 等于该值为精选）
+     */
+    int FEATURED_PRIORITY = 99;
 }

@@ -4,6 +4,7 @@ import com.mybatisflex.core.paginate.Page;
 import com.wwk.wwk_z_code.model.dto.ChatHistoryAddRequestDTO;
 import com.wwk.wwk_z_code.model.dto.ChatHistoryAdminQueryRequestDTO;
 import com.wwk.wwk_z_code.model.dto.ChatHistoryUserCursorQueryRequestDTO;
+import com.wwk.wwk_z_code.model.dto.RetractUserPromptRequestDTO;
 import com.wwk.wwk_z_code.model.entity.ChatHistory;
 import com.wwk.wwk_z_code.model.vo.ChatHistoryUserCursorPageVO;
 import com.wwk.wwk_z_code.model.vo.ChatHistoryVO;
@@ -61,7 +62,7 @@ public class ChatHistoryController {
      *
      * @param id 主键
      * @param request HTTP请求
-     * @return 聊天记录实体
+     * @return 聊天记录视图对象
      */
     @GetMapping("/user/{id}")
     public ChatHistoryVO getChatHistoryById(
@@ -120,5 +121,22 @@ public class ChatHistoryController {
             ChatHistoryUserCursorQueryRequestDTO dto,
             HttpServletRequest request) {
         return chatHistoryService.queryChatHistoryByCursor(dto, request);
+    }
+
+    /**
+     * 撤销用户提示词(USER，校验应用归属，就地把原 user 行改写为 retraction)
+     *
+     * @param retractUserPromptRequestDTO 撤销请求DTO
+     * @param request HTTP请求
+     * @return {@code true} 撤销成功（重复撤销幂等返回 true）
+     */
+    @PostMapping("/user/retraction")
+    public Boolean retractUserPrompt(
+            @Valid
+            @RequestBody
+            RetractUserPromptRequestDTO retractUserPromptRequestDTO,
+            HttpServletRequest request
+    ) {
+        return chatHistoryService.retractUserPrompt(retractUserPromptRequestDTO, request);
     }
 }

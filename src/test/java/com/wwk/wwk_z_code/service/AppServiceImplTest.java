@@ -2,6 +2,7 @@ package com.wwk.wwk_z_code.service;
 
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.wwk.wwk_z_code.constant.AppConstant;
 import com.wwk.wwk_z_code.core.AiCodeGeneratorFacade;
 import com.wwk.wwk_z_code.exception.BusinessException;
 import com.wwk.wwk_z_code.exception.ErrorCode;
@@ -10,11 +11,14 @@ import com.wwk.wwk_z_code.model.dto.AppAddRequestDTO;
 import com.wwk.wwk_z_code.model.dto.AppAdminQueryRequestDTO;
 import com.wwk.wwk_z_code.model.dto.AppAdminUpdateRequestDTO;
 import com.wwk.wwk_z_code.model.dto.AppCodeStreamQueryDTO;
+import com.wwk.wwk_z_code.model.dto.AppDeployRequestDTO;
 import com.wwk.wwk_z_code.model.dto.AppQueryRequestDTO;
 import com.wwk.wwk_z_code.model.dto.AppUpdateRequestDTO;
 import com.wwk.wwk_z_code.model.entity.App;
+import com.wwk.wwk_z_code.model.entity.ChatHistory;
 import com.wwk.wwk_z_code.model.entity.User;
 import com.wwk.wwk_z_code.model.enums.CodeGenEnum;
+import com.wwk.wwk_z_code.model.enums.MessageType;
 import com.wwk.wwk_z_code.model.enums.TagEnum;
 import com.wwk.wwk_z_code.model.vo.AppVO;
 import com.wwk.wwk_z_code.model.vo.UserVO;
@@ -24,12 +28,14 @@ import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Flux;
 
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -43,6 +49,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -127,6 +135,85 @@ class AppServiceImplTest {
 
         assertEquals(ErrorCode.FORBIDDEN_ERROR.getCode(), e.getCode());
         assertEquals("无权访问该应用", e.getMessage());
+    }
+
+    @Test
+    void getCodeGenStream_streamError_savesErrorChatHistory() {
+        loginAs(1L);
+        doReturn(App.builder().id(100L).createUserId(1L).codeGenType(CodeGenEnum.SINGLETON_HTML).build())
+                .when(service).getById(100L);
+        when(aiCodeGeneratorFacade.generateAndSaveCodeByStream(eq("做个博客"), eq(CodeGenEnum.SINGLETON_HTML), eq(100L), any(Consumer.class)))
+                .thenReturn(Flux.error(new RuntimeException("read timeout")));
+
+        Flux<String> flux = service.getCodeGenStream(streamDTO(100L, "做个博客"), request);
+        assertThrows(RuntimeException.class, () -> flux.collectList().block());
+
+        // 第 1 条为用户提示词（同步落库），第 2 条为流失败时的错误记录
+        ArgumentCaptor<ChatHistory> captor = ArgumentCaptor.forClass(ChatHistory.class);
+        verify(chatHistoryService, times(2)).save(captor.capture());
+        List<ChatHistory> records = captor.getAllValues();
+        assertEquals(MessageType.USER, records.get(0).getMessageType());
+        ChatHistory errorRecord = records.get(1);
+        assertEquals(MessageType.ERROR, errorRecord.getMessageType());
+        assertEquals(100L, errorRecord.getAppId());
+        assertEquals(1L, errorRecord.getUserId());
+        assertTrue(errorRecord.getMessage().contains("read timeout"));
+    }
+
+    @Test
+    void getCodeGenStream_errorWithoutMessage_fallsBackToDefaultText() {
+        loginAs(1L);
+        doReturn(App.builder().id(100L).createUserId(1L).codeGenType(CodeGenEnum.SINGLETON_HTML).build())
+                .when(service).getById(100L);
+        // 无 message 的异常：错误文案须兜底，不能抛 NPE
+        when(aiCodeGeneratorFacade.generateAndSaveCodeByStream(eq("做个博客"), eq(CodeGenEnum.SINGLETON_HTML), eq(100L), any(Consumer.class)))
+                .thenReturn(Flux.error(new RuntimeException()));
+
+        Flux<String> flux = service.getCodeGenStream(streamDTO(100L, "做个博客"), request);
+        assertThrows(RuntimeException.class, () -> flux.collectList().block());
+
+        ArgumentCaptor<ChatHistory> captor = ArgumentCaptor.forClass(ChatHistory.class);
+        verify(chatHistoryService, times(2)).save(captor.capture());
+        ChatHistory errorRecord = captor.getAllValues().get(1);
+        assertEquals(MessageType.ERROR, errorRecord.getMessageType());
+        assertEquals(ErrorCode.CODE_GENERATE_ERROR.getMessage(), errorRecord.getMessage());
+    }
+
+    @Test
+    void getCodeGenStream_retryTrue_success_doesNotSaveUserPrompt() {
+        loginAs(1L);
+        doReturn(App.builder().id(100L).createUserId(1L).codeGenType(CodeGenEnum.SINGLETON_HTML).build())
+                .when(service).getById(100L);
+        when(aiCodeGeneratorFacade.generateAndSaveCodeByStream(eq("做个博客"), eq(CodeGenEnum.SINGLETON_HTML), eq(100L), any(Consumer.class)))
+                .thenReturn(Flux.just("a", "b"));
+
+        List<String> emitted = service.getCodeGenStream(streamDTO(100L, "做个博客", true), request)
+                .collectList().block();
+
+        assertEquals(List.of("a", "b"), emitted);
+        // 重试请求：提示词此前已落库，本次不再写入
+        verify(chatHistoryService, never()).save(any(ChatHistory.class));
+    }
+
+    @Test
+    void getCodeGenStream_retryTrue_streamError_onlySavesErrorRecord() {
+        loginAs(1L);
+        doReturn(App.builder().id(100L).createUserId(1L).codeGenType(CodeGenEnum.SINGLETON_HTML).build())
+                .when(service).getById(100L);
+        when(aiCodeGeneratorFacade.generateAndSaveCodeByStream(eq("做个博客"), eq(CodeGenEnum.SINGLETON_HTML), eq(100L), any(Consumer.class)))
+                .thenReturn(Flux.error(new RuntimeException("read timeout")));
+
+        Flux<String> flux = service.getCodeGenStream(streamDTO(100L, "做个博客", true), request);
+        assertThrows(RuntimeException.class, () -> flux.collectList().block());
+
+        // 重试请求跳过用户提示词，只留一条流失败的错误记录
+        ArgumentCaptor<ChatHistory> captor = ArgumentCaptor.forClass(ChatHistory.class);
+        verify(chatHistoryService, times(1)).save(captor.capture());
+        ChatHistory errorRecord = captor.getValue();
+        assertEquals(MessageType.ERROR, errorRecord.getMessageType());
+        assertEquals(100L, errorRecord.getAppId());
+        assertEquals(1L, errorRecord.getUserId());
+        assertTrue(errorRecord.getMessage().contains("read timeout"));
     }
 
     // endregion
@@ -296,6 +383,76 @@ class AppServiceImplTest {
 
     // endregion
 
+    // region 预览 / 部署（路径拼接与目录校验）
+
+    @TempDir
+    Path tempDir;
+
+    @Test
+    void previewApp_success_returnsUrlWithDirNameOnly() {
+        loginAs(1L);
+        App app = App.builder().id(100L).createUserId(1L)
+                .codeGenDir(tempDir.toString()).build();
+        doReturn(app).when(service).getById(100L);
+
+        String url = service.previewApp(100L, request);
+
+        assertEquals(AppConstant.LOCAL_RREVIEW_BASE_URL + "/" + tempDir.getFileName(), url);
+    }
+
+    @Test
+    void previewApp_dirNotExists_throwsCodeGenerateNotFound() {
+        loginAs(1L);
+        App app = App.builder().id(100L).createUserId(1L)
+                .codeGenDir(tempDir.resolve("not-exists").toString()).build();
+        doReturn(app).when(service).getById(100L);
+
+        BusinessException e = assertThrows(BusinessException.class, () -> service.previewApp(100L, request));
+
+        assertEquals(ErrorCode.CODE_GENERATE_NOT_FOUND.getCode(), e.getCode());
+    }
+
+    @Test
+    void previewApp_blankCodeGenDir_throwsParamError() {
+        loginAs(1L);
+        App app = App.builder().id(100L).createUserId(1L).codeGenDir("  ").build();
+        doReturn(app).when(service).getById(100L);
+
+        BusinessException e = assertThrows(BusinessException.class, () -> service.previewApp(100L, request));
+
+        assertEquals(ErrorCode.PARAM_ERROR.getCode(), e.getCode());
+    }
+
+    @Test
+    void deployApp_dirNotExists_throwsCodeGenerateNotFound() {
+        loginAs(1L);
+        // deployKey 非空 → 跳过随机生成分支，无需额外桩 getOne
+        App app = App.builder().id(100L).createUserId(1L).deployKey("abc123")
+                .codeGenDir(tempDir.resolve("not-exists").toString()).build();
+        doReturn(app).when(service).getById(100L);
+        AppDeployRequestDTO dto = new AppDeployRequestDTO();
+        dto.setAppId(100L);
+
+        BusinessException e = assertThrows(BusinessException.class, () -> service.deployApp(dto, request));
+
+        assertEquals(ErrorCode.CODE_GENERATE_NOT_FOUND.getCode(), e.getCode());
+    }
+
+    @Test
+    void deployApp_blankCodeGenDir_throwsParamError() {
+        loginAs(1L);
+        App app = App.builder().id(100L).createUserId(1L).deployKey("abc123").codeGenDir("").build();
+        doReturn(app).when(service).getById(100L);
+        AppDeployRequestDTO dto = new AppDeployRequestDTO();
+        dto.setAppId(100L);
+
+        BusinessException e = assertThrows(BusinessException.class, () -> service.deployApp(dto, request));
+
+        assertEquals(ErrorCode.PARAM_ERROR.getCode(), e.getCode());
+    }
+
+    // endregion
+
     // region 管理员业务方法
 
     @Test
@@ -427,9 +584,14 @@ class AppServiceImplTest {
     }
 
     private AppCodeStreamQueryDTO streamDTO(Long appId, String prompt) {
+        return streamDTO(appId, prompt, false);
+    }
+
+    private AppCodeStreamQueryDTO streamDTO(Long appId, String prompt, Boolean retry) {
         AppCodeStreamQueryDTO dto = new AppCodeStreamQueryDTO();
         dto.setAppId(appId);
         dto.setUserPrompt(prompt);
+        dto.setRetry(retry);
         return dto;
     }
 

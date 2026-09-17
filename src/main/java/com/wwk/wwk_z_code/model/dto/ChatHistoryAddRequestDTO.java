@@ -34,9 +34,9 @@ public class ChatHistoryAddRequestDTO implements Serializable {
     private String message;
 
     /**
-     * 消息类型（JSON传入 code 值："user"/"ai"）
+     * 消息类型（JSON传入 code 值："user"/"ai"/"error"/"retraction"）
      */
     @NotNull(message = "消息类型不能为空")
-    @Schema(type = "string", description = "消息类型：user=用户消息，ai=AI回复")
+    @Schema(type = "string", description = "消息类型：user=用户消息，ai=AI回复，error=错误消息，retraction=撤销的消息")
     private MessageType messageType;
 }

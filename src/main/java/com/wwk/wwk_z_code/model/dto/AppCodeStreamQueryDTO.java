@@ -32,4 +32,11 @@ public class AppCodeStreamQueryDTO implements Serializable {
     @NotNull
     @NotBlank
     private String userPrompt;
+
+    /**
+     * 是否重试：true 表示本次为失败重试，用户提示词不再落库
+     */
+    @NotNull
+    @Schema(description = "是否重试：true 时本次用户提示词不落库")
+    private Boolean retry;
 }

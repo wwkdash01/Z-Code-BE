@@ -42,6 +42,7 @@ build/
 /.claude
 
 ### 公开展示仓库不包含（保留本地）###
+/README.md
 /.gitattributes
 /data-analysis-integration.md
 /plan/

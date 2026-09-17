@@ -178,6 +178,8 @@ class ChatHistoryCursorTest {
 
         assertEquals(1, ((List<?>) vo.getRecords()).size());
         assertEquals(MessageType.AI, ((ChatHistoryVO) ((List<?>) vo.getRecords()).get(0)).getMessageType());
+        // 主键 id 需一并透出，前端据此定位单条消息
+        assertEquals(Long.valueOf(1L), ((ChatHistoryVO) ((List<?>) vo.getRecords()).get(0)).getId());
     }
 
     @Test

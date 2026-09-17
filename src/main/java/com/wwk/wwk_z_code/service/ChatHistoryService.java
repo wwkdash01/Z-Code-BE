@@ -4,6 +4,7 @@ import com.mybatisflex.core.paginate.Page;
 import com.wwk.wwk_z_code.model.dto.ChatHistoryAddRequestDTO;
 import com.wwk.wwk_z_code.model.dto.ChatHistoryAdminQueryRequestDTO;
 import com.wwk.wwk_z_code.model.dto.ChatHistoryUserCursorQueryRequestDTO;
+import com.wwk.wwk_z_code.model.dto.RetractUserPromptRequestDTO;
 import com.wwk.wwk_z_code.model.entity.ChatHistory;
 import com.wwk.wwk_z_code.model.vo.ChatHistoryUserCursorPageVO;
 import com.wwk.wwk_z_code.model.vo.ChatHistoryVO;
@@ -31,7 +32,7 @@ public interface ChatHistoryService extends IService<ChatHistory> {
      * 根据主键获取详情（USER，需校验应用归属）
      * @param id 主键
      * @param request HTTP请求
-     * @return 聊天记录实体
+     * @return 聊天记录视图对象
      */
     ChatHistoryVO getChatHistoryById(Long id, HttpServletRequest request);
 
@@ -65,4 +66,16 @@ public interface ChatHistoryService extends IService<ChatHistory> {
      * @return 游标分页结果VO
      */
     ChatHistoryUserCursorPageVO queryChatHistoryByCursor(ChatHistoryUserCursorQueryRequestDTO dto, HttpServletRequest request);
+
+    /**
+     * 撤销用户提示词（USER，需登录并校验应用归属）
+     * <p>就地把原 user 行的 messageType 改写为 retraction，id 与 message 原文保留，
+     * 供前端定位并丢弃被撤销的那一轮对话；该轮后续的 ai/error 行不做处理。</p>
+     * <p>chatHistoryId 不传时按最新一轮失败对话定位：最新一条必须是 error（说明生成失败过），
+     * 再往前取第一条 user/retraction；目标已是 retraction 或并发下已被撤销时幂等返回 true。</p>
+     * @param retractUserPromptRequestDTO 撤销请求DTO
+     * @param request HTTP请求
+     * @return {@code true} 撤销成功（含重复撤销）
+     */
+    Boolean retractUserPrompt(RetractUserPromptRequestDTO retractUserPromptRequestDTO, HttpServletRequest request);
 }

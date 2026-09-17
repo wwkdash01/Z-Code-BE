@@ -27,10 +27,10 @@ public class ChatHistoryUserCursorQueryRequestDTO extends PageRequest implements
     private Long appId;
 
     /**
-     * 消息类型过滤（"user"/"ai"）
+     * 消息类型过滤（按 code 值："user"/"ai"/"error"/"retraction"）
      */
     @Length(max = 64, message = "消息类型不合法")
-    @Schema(description = "消息类型过滤：user/ai")
+    @Schema(description = "消息类型过滤：user=用户消息，ai=AI回复，error=错误消息，retraction=撤销的消息")
     private String messageType;
 
     /**

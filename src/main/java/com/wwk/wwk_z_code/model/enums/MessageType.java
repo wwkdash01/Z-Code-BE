@@ -8,13 +8,30 @@ import lombok.Getter;
 
 /**
  * 消息类型枚举
- * <p>持久化与 JSON 序列化均使用 {@link #getCode()} 值（"user"/"ai"）。</p>
+ * <p>持久化与 JSON 序列化均使用 {@link #getCode()} 值（"user"/"ai"/"error"/"retraction"）。</p>
  */
 @Getter
 public enum MessageType {
 
+    /**
+     * 用户消息
+     */
     USER("user", "用户消息"),
-    AI("ai", "AI回复");
+
+    /**
+     * AI回复
+     */
+    AI("ai", "AI回复"),
+
+    /**
+     * 错误消息
+     */
+    ERROR("error", "错误消息"),
+
+    /**
+     * 撤销的消息
+     */
+    RETRACTION("retraction", "撤销的消息");
 
     /**
      * 消息类型代码（数据库存储值 / JSON 序列化值）

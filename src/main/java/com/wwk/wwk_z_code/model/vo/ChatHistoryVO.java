@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 
 /**
  * 聊天记录视图对象，仅暴露用户接口所需字段。
+ * <p>含主键 id 供前端定位单条消息（撤销等操作需要），其余审计字段与逻辑删除标记不对外暴露。</p>
  *
  * @author wangwenkai
  * @since 2026-09-10
@@ -19,6 +20,12 @@ public class ChatHistoryVO implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
+
+    /**
+     * 会话记录主键ID
+     */
+    @Schema(type = "string", description = "会话记录主键ID")
+    private Long id;
 
     /**
      * 关联应用ID

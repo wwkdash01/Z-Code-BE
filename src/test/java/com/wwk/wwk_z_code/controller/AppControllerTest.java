@@ -1,12 +1,16 @@
 package com.wwk.wwk_z_code.controller;
 
 import com.mybatisflex.core.paginate.Page;
+import com.wwk.wwk_z_code.exception.BusinessException;
+import com.wwk.wwk_z_code.exception.ErrorCode;
+import com.wwk.wwk_z_code.model.dto.AppCodeStreamQueryDTO;
 import com.wwk.wwk_z_code.model.entity.App;
 import com.wwk.wwk_z_code.model.enums.CodeGenEnum;
 import com.wwk.wwk_z_code.model.enums.TagEnum;
 import com.wwk.wwk_z_code.model.vo.AppVO;
 import com.wwk.wwk_z_code.service.AppService;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -19,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -81,6 +86,53 @@ class AppControllerTest {
         mvc.perform(get("/apps/guest/page/featured").param("sortField", "priority"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(40000));
+    }
+
+    // endregion
+
+    // region featured-detail (GET /apps/guest/{id})
+
+    @Test
+    void featuredDetail_success_returnsAppVO() throws Exception {
+        AppVO vo = new AppVO();
+        vo.setId(1L);
+        vo.setAppName("精选博客");
+        vo.setPriority(99);
+        vo.setCodeGenType(CodeGenEnum.SINGLETON_HTML);
+        vo.setAppTag(TagEnum.WEB_PAGE);
+        vo.setUserName("admin");
+        vo.setUserAvatar("http://avatar");
+        when(appService.getFeaturedAppById(eq(1L))).thenReturn(vo);
+
+        mvc.perform(get("/apps/guest/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.appName").value("精选博客"))
+                .andExpect(jsonPath("$.data.priority").value(99))
+                .andExpect(jsonPath("$.data.codeGenType").value("singleton"))
+                .andExpect(jsonPath("$.data.appTag").value("webPage"))
+                .andExpect(jsonPath("$.data.userName").value("admin"))
+                .andExpect(jsonPath("$.data.userAvatar").value("http://avatar"));
+
+        verify(appService).getFeaturedAppById(eq(1L));
+    }
+
+    @Test
+    void featuredDetail_nonFeatured_returnsForbidden() throws Exception {
+        when(appService.getFeaturedAppById(eq(2L)))
+                .thenThrow(new BusinessException(ErrorCode.FORBIDDEN_ERROR, "应用不存在或非精选应用"));
+
+        mvc.perform(get("/apps/guest/2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(40300))
+                .andExpect(jsonPath("$.message").value("应用不存在或非精选应用"));
+    }
+
+    @Test
+    void featuredDetail_invalidId_returnsSystemError() throws Exception {
+        // @PathVariable @Min 校验失败 → ConstraintViolationException → 兜底 SYSTEM_ERROR
+        mvc.perform(get("/apps/guest/0"))
+                .andExpect(jsonPath("$.code").value(50000));
     }
 
     // endregion
@@ -407,13 +459,15 @@ class AppControllerTest {
 
         MvcResult mvcResult = mvc.perform(get("/apps/user/code-stream")
                         .param("appId", "1")
-                        .param("userPrompt", "做个博客"))
+                        .param("userPrompt", "做个博客")
+                        .param("retry", "false"))
                 .andExpect(request().asyncStarted())
                 .andReturn();
 
         mvc.perform(asyncDispatch(mvcResult))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("text/event-stream"))
+                .andExpect(content().string(containsString("event:message")))
                 .andExpect(content().string(containsString("data:{\"d\":\"a\"}")))
                 .andExpect(content().string(containsString("event:done")));
 
@@ -425,6 +479,91 @@ class AppControllerTest {
         // 缺 appId → AppCodeStreamQueryDTO @NotNull 校验失败 → PARAM_ERROR
         mvc.perform(get("/apps/user/code-stream").param("userPrompt", "做个博客"))
                 .andExpect(jsonPath("$.code").value(40000));
+    }
+
+    @Test
+    void codeStream_missingRetry_returnsParamError() throws Exception {
+        // 缺 retry → AppCodeStreamQueryDTO @NotNull 校验失败 → PARAM_ERROR
+        mvc.perform(get("/apps/user/code-stream")
+                        .param("appId", "1")
+                        .param("userPrompt", "做个博客"))
+                .andExpect(jsonPath("$.code").value(40000));
+    }
+
+    @Test
+    void codeStream_retryTrue_passesParamThrough() throws Exception {
+        when(appService.getCodeGenStream(any(), any())).thenReturn(Flux.just("a"));
+
+        MvcResult mvcResult = mvc.perform(get("/apps/user/code-stream")
+                        .param("appId", "1")
+                        .param("userPrompt", "做个博客")
+                        .param("retry", "true"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("event:done")));
+
+        ArgumentCaptor<AppCodeStreamQueryDTO> captor = ArgumentCaptor.forClass(AppCodeStreamQueryDTO.class);
+        verify(appService).getCodeGenStream(captor.capture(), any());
+        assertEquals(Boolean.TRUE, captor.getValue().getRetry());
+    }
+
+    @Test
+    void codeStream_streamError_emitsErrorEvent() throws Exception {
+        when(appService.getCodeGenStream(any(), any()))
+                .thenReturn(Flux.error(new RuntimeException("boom")));
+
+        MvcResult mvcResult = mvc.perform(get("/apps/user/code-stream")
+                        .param("appId", "1")
+                        .param("userPrompt", "做个博客")
+                        .param("retry", "false"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("text/event-stream"))
+                .andExpect(content().string(containsString("event:error")))
+                .andExpect(content().string(containsString("\"code\":50001")))
+                .andExpect(content().string(containsString("boom")));
+    }
+
+    @Test
+    void codeStream_errorWithoutMessage_stillEmitsErrorEvent() throws Exception {
+        // 回归：异常的 message 为 null 时，兜底逻辑不得抛 NPE 导致断流
+        when(appService.getCodeGenStream(any(), any()))
+                .thenReturn(Flux.error(new RuntimeException()));
+
+        MvcResult mvcResult = mvc.perform(get("/apps/user/code-stream")
+                        .param("appId", "1")
+                        .param("userPrompt", "做个博客")
+                        .param("retry", "false"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("text/event-stream"))
+                .andExpect(content().string(containsString("event:error")))
+                .andExpect(content().string(containsString("代码生成失败")));
+    }
+
+    @Test
+    void codeStream_syncBusinessException_returnsJson() throws Exception {
+        // 建立流之前的业务异常仍由全局异常处理器返回 JSON 包装体，不是 SSE 帧
+        when(appService.getCodeGenStream(any(), any()))
+                .thenThrow(new BusinessException(ErrorCode.NOT_LOGIN_ERROR, "用户未登录"));
+
+        mvc.perform(get("/apps/user/code-stream")
+                        .param("appId", "1")
+                        .param("userPrompt", "做个博客")
+                        .param("retry", "false"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value(40100))
+                .andExpect(jsonPath("$.message").value("用户未登录"));
     }
 
     // endregion
